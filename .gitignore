@@ -1,0 +1,16 @@
+# 个人敏感信息
+cookie.json
+
+# 爬取的数据
+weibo/
+
+# 日志文件
+log/
+*.log
+
+# Python缓存文件
+__pycache__/
+*.py[cod]
+
+# IDE配置
+.vscode/
