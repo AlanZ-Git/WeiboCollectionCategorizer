@@ -190,6 +190,36 @@ def parse_weibo_data(weibo_data, user_id):
     
     # 处理微博文本
     text = weibo_data.get('text', '')
+    
+    # 提取链接并转换为Markdown格式
+    link_pattern = r'<a[^>]*href="([^"]*)"[^>]*>(.*?)</a>'
+    
+    def replace_link(match):
+        url = match.group(1)
+        link_text = match.group(2)
+        
+        # 过滤掉表情链接和话题链接
+        if url.startswith('/') or 'emotion' in url or '#' in link_text:
+            return link_text
+        
+        # 处理微博外链警告链接
+        if 'sinaurl?u=' in url:
+            # 提取真实URL
+            real_url = url.split('sinaurl?u=', 1)[1]
+            # 解码百分比编码
+            try:
+                from urllib.parse import unquote
+                real_url = unquote(real_url)
+            except Exception as e:
+                logger.warning(f"解码URL失败: {e}")
+            url = real_url
+        
+        return f"[{link_text}]({url})"
+    
+    # 替换链接为Markdown格式
+    text = re.sub(link_pattern, replace_link, text)
+    
+    # 清理其他HTML标签
     weibo['text'] = re.sub('<[^<]+?>', '', text).replace('\n', '').strip()
     
     # 获取图片
@@ -261,6 +291,11 @@ def parse_weibo_data(weibo_data, user_id):
         
         # 获取原微博文本并存入text
         retweet_text = retweet.get('text', '')
+        
+        # 替换原微博中的链接为Markdown格式
+        retweet_text = re.sub(link_pattern, replace_link, retweet_text)
+        
+        # 清理其他HTML标签
         weibo['text'] = re.sub('<[^<]+?>', '', retweet_text).replace('\n', '').strip()
         
         # 将当前微博文本存入retweet_text
