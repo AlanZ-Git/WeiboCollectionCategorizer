@@ -26,6 +26,7 @@ def get_best_video_urls(weibo_data):
         video_groups = {}
         
         for i, pic in enumerate(weibo_data['pics']):
+            # 处理LivePhoto类型视频
             if pic.get('type') == 'livephoto' and 'videoSrc' in pic:
                 url = pic['videoSrc']
                 # 提取视频文件名作为唯一标识
@@ -49,6 +50,31 @@ def get_best_video_urls(weibo_data):
                         'resolution': resolution,
                         'index': i + 1,  # 保存原始序号，从1开始
                         'is_livephoto': True
+                    }
+            # 处理普通视频类型
+            elif pic.get('type') == 'video' and 'videoSrc' in pic:
+                url = pic['videoSrc']
+                # 提取视频文件名作为唯一标识
+                video_filename = url.split('/')[-1].split('?')[0]
+                
+                # 提取分辨率
+                resolution = 0
+                if 'template=' in url:
+                    try:
+                        res_part = url.split('template=')[1].split('&')[0]
+                        if 'x' in res_part:
+                            width = int(res_part.split('x')[0])
+                            resolution = width
+                    except:
+                        pass
+                
+                # 如果这个文件名还没有记录，或者当前分辨率更高，则更新
+                if video_filename not in video_groups or resolution > video_groups[video_filename]['resolution']:
+                    video_groups[video_filename] = {
+                        'url': url,
+                        'resolution': resolution,
+                        'index': i + 1,  # 保存原始序号，从1开始
+                        'is_livephoto': False
                     }
         
         # 收集每个不同视频的最高清晰度版本
@@ -99,34 +125,12 @@ def get_best_video_urls(weibo_data):
             already_added = any(info['url'] == live_photo_url for info in video_infos)
             
             if not already_added:
-                # 尝试找到对应的索引
+                # 尝试找到对应的图片索引
                 found_index = -1
-                
-                # 首先检查是否在映射中
-                if live_photo_url in livephoto_url_to_index:
-                    found_index = livephoto_url_to_index[live_photo_url]
-                else:
-                    # 如果不在映射中，尝试匹配URL的一部分
-                    for i, pic in enumerate(weibo_data['pics']):
-                        # 提取LivePhoto URL和pic中videoSrc的关键部分进行比较
-                        live_photo_key = live_photo_url.split('livephoto=')[1].split('%')[0] if 'livephoto=' in live_photo_url else ''
-                        pic_video_src = pic.get('videoSrc', '')
-                        pic_video_key = pic_video_src.split('livephoto=')[1].split('%')[0] if 'livephoto=' in pic_video_src else ''
-                        
-                        if live_photo_key and pic_video_key and live_photo_key == pic_video_key:
-                            found_index = i + 1
-                            logger.info(f"通过URL部分匹配找到LivePhoto索引: {found_index}")
-                            break
-                
-                # 如果仍然没找到，尝试通过图片中的其他字段匹配
-                if found_index == -1:
-                    for i, pic in enumerate(weibo_data['pics']):
-                        if (pic.get('live_photo_url') == live_photo_url or 
-                            (pic.get('values') and pic['values'].get('live_photo_url') == live_photo_url) or
-                            pic.get('live_photo') == live_photo_url):
-                            found_index = i + 1
-                            logger.info(f"通过其他字段匹配找到LivePhoto索引: {found_index}")
-                            break
+                for i, pic in enumerate(weibo_data['pics']):
+                    if pic.get('type') == 'livephoto' and pic.get('videoSrc') == live_photo_url:
+                        found_index = i + 1
+                        break
                 
                 # 如果找到了对应的图片索引，使用该索引
                 if found_index != -1:
