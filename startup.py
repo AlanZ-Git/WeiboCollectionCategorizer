@@ -178,7 +178,7 @@ def get_single_weibo_backup(user_id, weibo_id, cookie):
         return None
 
 # 下载图片到本地
-def download_image(url, user_id, bid, index):
+def download_image(url, user_id, bid, index, overwrite=False):
     """
     下载图片并保存到本地
     
@@ -187,6 +187,7 @@ def download_image(url, user_id, bid, index):
         user_id: 用户ID
         bid: 微博bid
         index: 图片序号
+        overwrite: 是否覆盖已存在的文件
     
     Returns:
         保存的相对路径，如果下载失败则返回None
@@ -207,6 +208,11 @@ def download_image(url, user_id, bid, index):
         file_path = os.path.join(pics_dir, filename)
         relative_path = os.path.join('pics', filename)
         
+        # 检查文件是否已存在
+        if os.path.exists(file_path) and not overwrite:
+            logger.info(f"图片已存在，跳过下载: {file_path}")
+            return relative_path
+        
         # 设置请求头，模拟浏览器行为
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36",
@@ -224,14 +230,14 @@ def download_image(url, user_id, bid, index):
                 if chunk:
                     f.write(chunk)
         
-        logger.info(f"图片已下载到: {file_path}")
+        logger.info(f"图片已{'覆盖' if overwrite and os.path.exists(file_path) else ''}下载到: {file_path}")
         return relative_path
     except Exception as e:
         logger.error(f"下载图片失败: {e}, URL: {url}")
         return None
 
 # 解析微博数据
-def parse_weibo_data(weibo_data, user_id):
+def parse_weibo_data(weibo_data, user_id, overwrite_pics=False):
     if not weibo_data:
         return None
 
@@ -287,7 +293,7 @@ def parse_weibo_data(weibo_data, user_id):
                 pics.append(pic_url)
                 
                 # 下载图片并获取本地路径
-                local_path = download_image(pic_url, user_id, weibo['bid'], i+1)
+                local_path = download_image(pic_url, user_id, weibo['bid'], i+1, overwrite=overwrite_pics)
                 if local_path:
                     local_pics.append(local_path)
     
@@ -363,7 +369,7 @@ def parse_weibo_data(weibo_data, user_id):
                     retweet_pics.append(pic_url)
                     
                     # 下载图片并获取本地路径
-                    local_path = download_image(pic_url, weibo['retweet_user_id'], retweet.get('bid', ''), i+1)
+                    local_path = download_image(pic_url, weibo['retweet_user_id'], retweet.get('bid', ''), i+1, overwrite=overwrite_pics)
                     if local_path:
                         retweet_local_pics.append(local_path)
         
@@ -449,7 +455,7 @@ def get_pending_tasks(ignore_status=False):
     from download_tasks import get_pending_tasks
     return get_pending_tasks(ignore_status)
 
-def main(ignore_status=False):
+def main(ignore_status=False, overwrite_pics=False):
     # 从任务文件获取待处理任务
     from download_tasks import update_task_status
 
@@ -491,7 +497,7 @@ def main(ignore_status=False):
             continue
 
         # 解析微博数据
-        weibo = parse_weibo_data(weibo_data, user_id)
+        weibo = parse_weibo_data(weibo_data, user_id, overwrite_pics=overwrite_pics)
         if not weibo:
             logger.error("解析微博数据失败")
             update_task_status(url, 'failed')
@@ -508,8 +514,14 @@ def main(ignore_status=False):
 if __name__ == "__main__":
     # 检查命令行参数
     ignore_status = True
-    if len(sys.argv) > 1 and sys.argv[1] == '--ignore-status':
-        ignore_status = True
-        logger.info("忽略任务状态，将处理所有任务")
+    overwrite_pics = True
+    
+    for arg in sys.argv[1:]:
+        if arg == '--ignore-status':
+            ignore_status = True
+            logger.info("忽略任务状态，将处理所有任务")
+        elif arg == '--overwrite-pics':
+            overwrite_pics = True
+            logger.info("启用图片覆盖模式，将重新下载所有图片")
 
-    main(ignore_status)
+    main(ignore_status, overwrite_pics)

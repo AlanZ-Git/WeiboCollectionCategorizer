@@ -3,6 +3,7 @@ cookie.json
 
 # 爬取的数据
 weibo/
+pics/
 
 # 日志文件
 log/
@@ -15,4 +16,5 @@ __pycache__/
 # IDE配置
 .vscode/
 
+# 下载任务
 download_tasks.csv
