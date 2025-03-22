@@ -177,6 +177,59 @@ def get_single_weibo_backup(user_id, weibo_id, cookie):
         logger.error(f"备用API请求出错: {e}")
         return None
 
+# 下载图片到本地
+def download_image(url, user_id, bid, index):
+    """
+    下载图片并保存到本地
+    
+    Args:
+        url: 图片URL
+        user_id: 用户ID
+        bid: 微博bid
+        index: 图片序号
+    
+    Returns:
+        保存的相对路径，如果下载失败则返回None
+    """
+    try:
+        # 创建pics目录
+        pics_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pics')
+        if not os.path.isdir(pics_dir):
+            os.makedirs(pics_dir)
+        
+        # 从URL中获取文件扩展名
+        file_ext = os.path.splitext(url.split('/')[-1])[1]
+        if not file_ext or len(file_ext) > 5:  # 如果没有扩展名或扩展名异常
+            file_ext = '.jpg'  # 默认使用jpg
+        
+        # 构建文件名和路径
+        filename = f"{user_id}_{bid}_{index}{file_ext}"
+        file_path = os.path.join(pics_dir, filename)
+        relative_path = os.path.join('pics', filename)
+        
+        # 设置请求头，模拟浏览器行为
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36",
+            "Referer": "https://weibo.com/",
+            "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8"
+        }
+        
+        # 下载图片
+        response = requests.get(url, headers=headers, timeout=30, stream=True)
+        response.raise_for_status()
+        
+        # 保存图片
+        with open(file_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+        
+        logger.info(f"图片已下载到: {file_path}")
+        return relative_path
+    except Exception as e:
+        logger.error(f"下载图片失败: {e}, URL: {url}")
+        return None
+
 # 解析微博数据
 def parse_weibo_data(weibo_data, user_id):
     if not weibo_data:
@@ -226,11 +279,22 @@ def parse_weibo_data(weibo_data, user_id):
 
     # 获取图片
     pics = []
+    local_pics = []
     if 'pics' in weibo_data and weibo_data['pics']:
-        for pic in weibo_data['pics']:
+        for i, pic in enumerate(weibo_data['pics']):
             if 'large' in pic and 'url' in pic['large']:
-                pics.append(pic['large']['url'])
-    weibo['pics'] = ','.join(pics)
+                pic_url = pic['large']['url']
+                pics.append(pic_url)
+                
+                # 下载图片并获取本地路径
+                local_path = download_image(pic_url, user_id, weibo['bid'], i+1)
+                if local_path:
+                    local_pics.append(local_path)
+    
+    # 保存原始图片URL（用于调试）
+    weibo['original_pics'] = ','.join(pics)
+    # 保存本地图片路径
+    weibo['pics'] = ','.join(local_pics)
 
     # 获取视频
     weibo['video_url'] = ''
@@ -291,16 +355,22 @@ def parse_weibo_data(weibo_data, user_id):
 
         # 获取原微博图片
         retweet_pics = []
+        retweet_local_pics = []
         if 'pics' in retweet and retweet['pics']:
-            for pic in retweet['pics']:
+            for i, pic in enumerate(retweet['pics']):
                 if 'large' in pic and 'url' in pic['large']:
-                    retweet_pics.append(pic['large']['url'])
-        weibo['retweet_pics'] = ','.join(retweet_pics)
-
-        # 获取原微博视频
-        if 'page_info' in retweet and retweet['page_info'] and retweet['page_info'].get('type') == 'video':
-            if 'media_info' in retweet['page_info'] and 'stream_url' in retweet['page_info']['media_info']:
-                weibo['retweet_video_url'] = retweet['page_info']['media_info']['stream_url']
+                    pic_url = pic['large']['url']
+                    retweet_pics.append(pic_url)
+                    
+                    # 下载图片并获取本地路径
+                    local_path = download_image(pic_url, weibo['retweet_user_id'], retweet.get('bid', ''), i+1)
+                    if local_path:
+                        retweet_local_pics.append(local_path)
+        
+        # 保存原始图片URL（用于调试）
+        weibo['original_retweet_pics'] = ','.join(retweet_pics)
+        # 保存本地图片路径
+        weibo['retweet_pics'] = ','.join(retweet_local_pics)
 
         # 添加原微博源URL
         if weibo['retweet_user_id'] and retweet.get('bid', ''):
@@ -327,6 +397,7 @@ def parse_weibo_data(weibo_data, user_id):
 
         # 使用 retweet_pics 的值替换 pics
         weibo['pics'] = weibo['retweet_pics']
+        weibo['original_pics'] = weibo['original_retweet_pics']
 
         # 使用 retweet_video_url 的值替换 video_url
         weibo['video_url'] = weibo['retweet_video_url']
