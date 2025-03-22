@@ -55,52 +55,7 @@ def get_cookie(config):
 
 # 获取单条微博
 def get_single_weibo(user_id, weibo_id, cookie):
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36",
-        "Cookie": cookie,
-        "Accept": "application/json, text/plain, */*"
-    }
-
-    # 尝试获取微博详情
-    url = f"https://m.weibo.cn/statuses/show?id={weibo_id}"
-    try:
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-
-        # 添加调试日志
-        logger.debug(f"API响应: {response.text[:200]}...")
-
-        # 检查响应内容是否为空
-        if not response.text.strip():
-            logger.error("API返回空响应")
-            return None
-
-        # 检查响应是否为HTML而不是JSON
-        if response.text.strip().startswith('<'):
-            logger.warning("API返回HTML而不是JSON，可能需要验证或cookie已过期")
-            return get_single_weibo_backup(user_id, weibo_id, cookie)
-
-        try:
-            data = response.json()
-
-            if data.get('ok') == 1 and 'data' in data:
-                return data['data']
-            else:
-                logger.error(f"获取微博失败: {data.get('msg', '未知错误')}")
-                return None
-        except json.JSONDecodeError as je:
-            logger.error(f"JSON解析错误: {je}, 响应内容: {response.text[:100]}...")
-
-            # 尝试使用备用API
-            return get_single_weibo_backup(user_id, weibo_id, cookie)
-    except Exception as e:
-        logger.error(f"请求微博详情出错: {e}")
-        # 尝试使用备用API
-        return get_single_weibo_backup(user_id, weibo_id, cookie)
-
-# 添加备用API获取微博
-def get_single_weibo_backup(user_id, weibo_id, cookie):
-    logger.info("尝试使用备用API获取微博")
+    logger.info("使用HTML解析方式获取微博数据")
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36",
         "Cookie": cookie,
@@ -140,7 +95,7 @@ def get_single_weibo_backup(user_id, weibo_id, cookie):
         # 检查响应是否为HTML
         if response.text.strip().startswith('<'):
             logger.warning("API返回HTML而不是JSON，可能需要验证或cookie已过期")
-            return None
+            return get_single_weibo_backup(user_id, weibo_id, cookie)
 
         data = response.json()
 
@@ -169,8 +124,55 @@ def get_single_weibo_backup(user_id, weibo_id, cookie):
                     logger.info("成功从第三种API方法中找到目标微博")
                     return card['mblog']
 
-        logger.error("所有备用API方法都无法获取微博数据")
-        return None
+        # 如果所有方法都失败，尝试使用备用API
+        logger.info("所有主要方法都无法获取微博数据，尝试使用备用API")
+        return get_single_weibo_backup(user_id, weibo_id, cookie)
+    except Exception as e:
+        logger.error(f"获取微博数据出错: {e}")
+        # 尝试使用备用API
+        logger.info("尝试使用备用API获取微博")
+        return get_single_weibo_backup(user_id, weibo_id, cookie)
+
+# 添加备用API获取微博（原来的主要API）
+def get_single_weibo_backup(user_id, weibo_id, cookie):
+    logger.info("尝试使用JSON API获取微博")
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36",
+        "Cookie": cookie,
+        "Accept": "application/json, text/plain, */*"
+    }
+
+    # 尝试获取微博详情
+    url = f"https://m.weibo.cn/statuses/show?id={weibo_id}"
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+
+        # 添加调试日志
+        logger.debug(f"API响应: {response.text[:200]}...")
+
+        # 检查响应内容是否为空
+        if not response.text.strip():
+            logger.error("API返回空响应")
+            return None
+
+        # 检查响应是否为HTML而不是JSON
+        if response.text.strip().startswith('<'):
+            logger.warning("备用API返回HTML而不是JSON，可能需要验证或cookie已过期")
+            return None
+
+        try:
+            data = response.json()
+
+            if data.get('ok') == 1 and 'data' in data:
+                logger.info("成功从JSON API获取微博数据")
+                return data['data']
+            else:
+                logger.error(f"获取微博失败: {data.get('msg', '未知错误')}")
+                return None
+        except json.JSONDecodeError as je:
+            logger.error(f"JSON解析错误: {je}, 响应内容: {response.text[:100]}...")
+            return None
     except Exception as e:
         logger.error(f"备用API请求出错: {e}")
         return None
