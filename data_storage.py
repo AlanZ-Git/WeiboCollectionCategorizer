@@ -10,10 +10,10 @@ logger = setup_logger()
 def save_to_csv(weibo):
     """
     保存微博数据到CSV文件
-    
+
     Args:
         weibo: 解析后的微博数据字典
-        
+
     Returns:
         bool: 保存成功返回True，否则返回False
     """

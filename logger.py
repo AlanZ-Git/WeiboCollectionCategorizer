@@ -13,7 +13,7 @@ def setup_logger():
     else:
         # 修改默认日志级别为INFO，这样DEBUG级别的日志就不会显示
         logging.basicConfig(
-            level=logging.INFO, 
+            level=logging.INFO,
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
             handlers=[
                 # 添加文件处理器，将所有日志（包括DEBUG）写入文件

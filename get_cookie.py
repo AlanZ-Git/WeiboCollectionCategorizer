@@ -32,10 +32,10 @@ def save_cookie(cookie):
     """保存Cookie到单独的setting.json文件"""
     base_dir = os.path.dirname(os.path.abspath(__file__))
     cookie_path = os.path.join(base_dir, 'setting.json')
-    
+
     # 创建Cookie数据
     cookie_data = {"cookie": cookie}
-    
+
     # 保存Cookie到setting.json
     try:
         with open(cookie_path, 'w', encoding='utf-8') as f:
@@ -49,17 +49,17 @@ def save_cookie(cookie):
 def get_cookie_interactive():
     """交互式获取并保存Cookie"""
     print_instructions()
-    
+
     try:
         cookie = input("请粘贴您的微博Cookie: ").strip()
-        
+
         if save_cookie(cookie):
             print("\n✅ Cookie已成功保存！")
             return cookie
         else:
             print("\n❌ Cookie保存失败，请检查日志获取详细信息。")
             return None
-    
+
     except KeyboardInterrupt:
         print("\n已取消操作")
         return None
@@ -72,7 +72,7 @@ def load_cookie():
     """从setting.json文件加载Cookie"""
     base_dir = os.path.dirname(os.path.abspath(__file__))
     cookie_path = os.path.join(base_dir, 'setting.json')
-    
+
     try:
         if os.path.exists(cookie_path):
             with open(cookie_path, 'r', encoding='utf-8') as f:

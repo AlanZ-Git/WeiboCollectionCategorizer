@@ -7,7 +7,7 @@ logger = logging.getLogger("weibo")
 def get_config():
     """
     获取配置信息
-    
+
     Returns:
         dict: 包含配置信息的字典
     """
@@ -19,10 +19,10 @@ def get_config():
 def get_cookie(config):
     """
     从配置文件中获取cookie
-    
+
     Args:
         config: 配置字典
-    
+
     Returns:
         str: cookie字符串，如果获取失败则返回空字符串
     """

@@ -10,28 +10,28 @@ logger = logging.getLogger(__name__)
 def get_best_video_urls(weibo_data):
     """
     从微博数据中提取所有视频链接，并为每个不同视频选择最高清晰度版本
-    
+
     Args:
         weibo_data: 微博数据字典
-    
+
     Returns:
         list: 包含视频信息的字典列表，每个字典包含url和index(原始序号)
     """
     # 直接从pics数组中提取视频链接
     video_infos = []
-    
+
     # 检查pics数组中的videoSrc字段
     if 'pics' in weibo_data and weibo_data['pics']:
         # 按照视频文件名分组
         video_groups = {}
-        
+
         for i, pic in enumerate(weibo_data['pics']):
             # 处理LivePhoto类型视频
             if pic.get('type') == 'livephoto' and 'videoSrc' in pic:
                 url = pic['videoSrc']
                 # 提取视频文件名作为唯一标识
                 video_filename = url.split('/')[-1].split('?')[0]
-                
+
                 # 提取分辨率
                 resolution = 0
                 if 'template=' in url:
@@ -42,7 +42,7 @@ def get_best_video_urls(weibo_data):
                             resolution = width
                     except:
                         pass
-                
+
                 # 如果这个文件名还没有记录，或者当前分辨率更高，则更新
                 if video_filename not in video_groups or resolution > video_groups[video_filename]['resolution']:
                     video_groups[video_filename] = {
@@ -56,7 +56,7 @@ def get_best_video_urls(weibo_data):
                 url = pic['videoSrc']
                 # 提取视频文件名作为唯一标识
                 video_filename = url.split('/')[-1].split('?')[0]
-                
+
                 # 提取分辨率
                 resolution = 0
                 if 'template=' in url:
@@ -67,7 +67,7 @@ def get_best_video_urls(weibo_data):
                             resolution = width
                     except:
                         pass
-                
+
                 # 如果这个文件名还没有记录，或者当前分辨率更高，则更新
                 if video_filename not in video_groups or resolution > video_groups[video_filename]['resolution']:
                     video_groups[video_filename] = {
@@ -76,7 +76,7 @@ def get_best_video_urls(weibo_data):
                         'index': i + 1,  # 保存原始序号，从1开始
                         'is_livephoto': False
                     }
-        
+
         # 收集每个不同视频的最高清晰度版本
         for video_info in video_groups.values():
             video_infos.append({
@@ -84,16 +84,16 @@ def get_best_video_urls(weibo_data):
                 'index': video_info['index'],
                 'is_livephoto': video_info.get('is_livephoto', False)
             })
-    
+
     # 检查page_info中的媒体数据
     if 'page_info' in weibo_data and weibo_data['page_info']:
         page_info = weibo_data['page_info']
-        
+
         # 检查是否为视频类型
         if page_info.get('type') == 'video':
             # 尝试获取高清视频链接
             media_info = page_info.get('media_info', {})
-            
+
             # 按优先级尝试不同的视频源
             for video_key in ['mp4_hd_url', 'mp4_720p_mp4', 'mp4_1080p_mp4', 'h265_mp4_hd', 'h265_mp4_ld']:
                 if video_key in media_info and media_info[video_key]:
@@ -105,25 +105,25 @@ def get_best_video_urls(weibo_data):
                         'is_livephoto': False
                     })
                     break
-    
+
     # 获取LivePhoto链接
     live_photo_list = get_live_photo(weibo_data)
-    
+
     # 查找pics数组中对应的LivePhoto索引
     if 'pics' in weibo_data and weibo_data['pics'] and live_photo_list:
         # 创建一个映射，将LivePhoto URL映射到其在pics中的索引
         livephoto_url_to_index = {}
-        
+
         # 首先遍历pics数组，建立映射关系
         for i, pic in enumerate(weibo_data['pics']):
             if pic.get('type') == 'livephoto' and 'videoSrc' in pic:
                 livephoto_url_to_index[pic['videoSrc']] = i + 1
-        
+
         # 处理从get_live_photo获取的LivePhoto列表
         for live_photo_url in live_photo_list:
             # 检查这个URL是否已经在video_infos中
             already_added = any(info['url'] == live_photo_url for info in video_infos)
-            
+
             if not already_added:
                 # 尝试找到对应的图片索引
                 found_index = -1
@@ -131,7 +131,7 @@ def get_best_video_urls(weibo_data):
                     if pic.get('type') == 'livephoto' and pic.get('videoSrc') == live_photo_url:
                         found_index = i + 1
                         break
-                
+
                 # 如果找到了对应的图片索引，使用该索引
                 if found_index != -1:
                     video_infos.append({
@@ -148,20 +148,20 @@ def get_best_video_urls(weibo_data):
                         'is_livephoto': True
                     })
                     logger.warning(f"LivePhoto未找到对应图片，使用新索引: {next_index}")
-    
+
     return video_infos
 
 def get_live_photo(weibo_data):
     """获取live photo中的视频url列表
-    
+
     Args:
         weibo_data: 微博数据字典
-    
+
     Returns:
         list: LivePhoto视频URL列表
     """
     live_photo_urls = []
-    
+
     # 检查pics数组中的videoSrc字段（这是最直接的方式）
     if 'pics' in weibo_data and weibo_data['pics']:
         for i, pic in enumerate(weibo_data['pics']):
@@ -170,7 +170,7 @@ def get_live_photo(weibo_data):
                 if live_photo_url and live_photo_url not in live_photo_urls:
                     live_photo_urls.append(live_photo_url)
                     logger.debug(f"从pics[{i}].videoSrc找到LivePhoto URL: {live_photo_url}")
-    
+
     # 如果上面的方法没有找到LivePhoto，尝试其他字段
     if not live_photo_urls:
         # 检查pics数组中的其他可能字段
@@ -194,7 +194,7 @@ def get_live_photo(weibo_data):
                     if live_photo_url and live_photo_url not in live_photo_urls:
                         live_photo_urls.append(live_photo_url)
                         logger.info(f"从pics[{i}].live_photo找到LivePhoto URL: {live_photo_url}")
-    
+
     # 检查微博数据中的live_photo字段
     if 'live_photo' in weibo_data:
         if isinstance(weibo_data['live_photo'], list):
@@ -207,29 +207,29 @@ def get_live_photo(weibo_data):
             if url and url not in live_photo_urls:
                 live_photo_urls.append(url)
             logger.debug(f"从微博根级别live_photo字符串找到LivePhoto URL: {url}")
-        
+
     return live_photo_urls
 
 def parse_weibo_data(weibo_data, user_id, overwrite_pics=False, overwrite_videos=False):
     """
     解析微博数据，提取文本、图片、视频等内容
-    
+
     Args:
         weibo_data: 微博数据字典
         user_id: 用户ID
         overwrite_pics: 是否覆盖已下载的图片
         overwrite_videos: 是否覆盖已下载的视频
-        
+
     Returns:
         dict: 解析后的微博数据字典
     """
     if not weibo_data:
         return None
-        
+
     # 获取下载路径
     download_paths = create_download_directories(get_download_path())
     debug_dir = os.path.join(download_paths['base'], 'debug')
-        
+
     # 添加调试日志，将微博数据结构保存到文件中
     try:
         if not os.path.isdir(debug_dir):
@@ -240,7 +240,7 @@ def parse_weibo_data(weibo_data, user_id, overwrite_pics=False, overwrite_videos
         logger.debug(f"已保存微博数据结构到: {debug_file}")
     except Exception as e:
         logger.warning(f"保存调试数据失败: {e}")
-    
+
     # 继续原有代码
     weibo = {}
     weibo['user_id'] = user_id
@@ -286,11 +286,11 @@ def parse_weibo_data(weibo_data, user_id, overwrite_pics=False, overwrite_videos
 
     # 检查是否为转发微博
     is_retweet = 'retweeted_status' in weibo_data and weibo_data['retweeted_status']
-    
+
     # 如果是转发微博，先获取原微博信息
     original_user_id = None
     original_bid = None
-    
+
     if is_retweet:
         retweet = weibo_data['retweeted_status']
         retweet_user = retweet.get('user', {})
@@ -299,11 +299,11 @@ def parse_weibo_data(weibo_data, user_id, overwrite_pics=False, overwrite_videos
         else:
             original_user_id = ''
         original_bid = retweet.get('bid', '')
-    
+
     # 获取图片
     pics = []
     local_pics = []
-    
+
     # 如果是转发微博，只处理原微博的图片
     if is_retweet and 'pics' in weibo_data['retweeted_status'] and weibo_data['retweeted_status']['pics']:
         retweet = weibo_data['retweeted_status']
@@ -311,7 +311,7 @@ def parse_weibo_data(weibo_data, user_id, overwrite_pics=False, overwrite_videos
             if 'large' in pic and 'url' in pic['large']:
                 pic_url = pic['large']['url']
                 pics.append(pic_url)
-                
+
                 # 下载图片并获取本地路径 - 使用原微博的user_id和bid
                 local_path = download_image(pic_url, original_user_id, original_bid, i+1, overwrite=overwrite_pics)
                 if local_path:
@@ -322,12 +322,12 @@ def parse_weibo_data(weibo_data, user_id, overwrite_pics=False, overwrite_videos
             if 'large' in pic and 'url' in pic['large']:
                 pic_url = pic['large']['url']
                 pics.append(pic_url)
-                
+
                 # 下载图片并获取本地路径
                 local_path = download_image(pic_url, user_id, weibo_data.get('bid', ''), i+1, overwrite=overwrite_pics)
                 if local_path:
                     local_pics.append(local_path)
-    
+
     # 保存原始图片URL（用于调试）
     weibo['original_pics'] = ','.join(pics)
     # 保存本地图片路径
@@ -336,17 +336,17 @@ def parse_weibo_data(weibo_data, user_id, overwrite_pics=False, overwrite_videos
     # 获取视频
     video_infos = []
     local_videos = []
-    
+
     # 如果是转发微博，只处理原微博的视频
     if is_retweet:
         video_infos = get_best_video_urls(weibo_data['retweeted_status'])
         for video_info in video_infos:
             # 使用原始序号下载视频
             local_path = download_video(
-                video_info['url'], 
-                original_user_id, 
-                original_bid, 
-                video_info['index'], 
+                video_info['url'],
+                original_user_id,
+                original_bid,
+                video_info['index'],
                 overwrite=overwrite_videos
             )
             if local_path:
@@ -356,15 +356,15 @@ def parse_weibo_data(weibo_data, user_id, overwrite_pics=False, overwrite_videos
         for video_info in video_infos:
             # 使用原始序号下载视频
             local_path = download_video(
-                video_info['url'], 
-                user_id, 
-                weibo_data.get('bid', ''), 
-                video_info['index'], 
+                video_info['url'],
+                user_id,
+                weibo_data.get('bid', ''),
+                video_info['index'],
                 overwrite=overwrite_videos
             )
             if local_path:
                 local_videos.append(local_path)
-    
+
     # 保存原始视频URL（用于调试）
     weibo['original_videos'] = ','.join([info['url'] for info in video_infos])
     # 保存本地视频路径
