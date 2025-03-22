@@ -14,3 +14,5 @@ __pycache__/
 
 # IDE配置
 .vscode/
+
+download_tasks.csv
