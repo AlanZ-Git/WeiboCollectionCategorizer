@@ -268,8 +268,13 @@ def parse_weibo_data(weibo_data, user_id):
         
         # 获取原微博用户信息
         retweet_user = retweet.get('user', {})
-        weibo['retweet_screen_name'] = retweet_user.get('screen_name', '')
-        weibo['retweet_user_id'] = retweet_user.get('id', '')
+        if retweet_user is not None:
+            weibo['retweet_screen_name'] = retweet_user.get('screen_name', '')
+            weibo['retweet_user_id'] = retweet_user.get('id', '')
+        else:
+            logger.warning("原微博用户信息不可见")
+            weibo['retweet_screen_name'] = '已删除'
+            weibo['retweet_user_id'] = ''
         
         # 获取原微博图片
         retweet_pics = []
@@ -327,11 +332,24 @@ def save_to_csv(weibo):
     logger.info(f"微博已保存到 {file_path}")
     return True
 
-def main():
-    # 从任务文件获取待处理任务
-    from download_tasks import get_pending_tasks, update_task_status
+def get_pending_tasks(ignore_status=False):
+    """
+    获取待处理的任务
     
-    tasks = get_pending_tasks()
+    Args:
+        ignore_status: 是否忽略状态，如果为True则返回所有任务
+    
+    Returns:
+        任务列表
+    """
+    from download_tasks import get_pending_tasks
+    return get_pending_tasks(ignore_status)
+
+def main(ignore_status=False):
+    # 从任务文件获取待处理任务
+    from download_tasks import update_task_status
+    
+    tasks = get_pending_tasks(ignore_status)
     if not tasks:
         logger.info("没有待处理的任务")
         return
@@ -384,4 +402,10 @@ def main():
             update_task_status(url, 'failed')
 
 if __name__ == "__main__":
-    main()
+    # 检查命令行参数
+    ignore_status = True
+    if len(sys.argv) > 1 and sys.argv[1] == '--ignore-status':
+        ignore_status = True
+        logger.info("忽略任务状态，将处理所有任务")
+    
+    main(ignore_status)

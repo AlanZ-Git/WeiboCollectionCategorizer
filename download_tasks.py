@@ -73,24 +73,28 @@ def update_task_status(url, status='completed'):
     
     return found
 
-def get_pending_tasks():
-    """获取所有待处理的任务"""
+def get_pending_tasks(ignore_status=False):
+    """
+    获取待处理的任务
+    
+    Args:
+        ignore_status: 是否忽略状态，如果为True则返回所有任务
+    
+    Returns:
+        任务列表
+    """
     file_path = init_tasks_file()
     
-    pending_tasks = []
+    tasks = []
     with open(file_path, 'r', encoding='utf-8-sig', newline='') as f:
-        reader = csv.reader(f)
-        next(reader)  # 跳过表头
-        
+        reader = csv.DictReader(f)
         for row in reader:
-            if row[1] == 'pending':
-                pending_tasks.append({
-                    'url': row[0],
-                    'notes': row[2],
-                    'created_at': row[3]
-                })
+            # 如果ignore_status为True，则返回所有任务
+            # 否则只返回状态为pending的任务
+            if ignore_status or row.get('status', '').lower() == 'pending':
+                tasks.append(row)
     
-    return pending_tasks
+    return tasks
 
 def get_all_tasks():
     """获取所有任务"""
