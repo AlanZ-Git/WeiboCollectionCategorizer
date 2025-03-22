@@ -18,8 +18,6 @@ else:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("weibo")
 
-# 目标微博URL
-tgt_url = 'https://weibo.com/3047892900/PjfGgqXUr'
 
 # 从URL中提取用户ID和微博ID
 def extract_ids_from_url(url):
@@ -258,9 +256,15 @@ def parse_weibo_data(weibo_data, user_id):
         retweet = weibo_data['retweeted_status']
         weibo['retweet_id'] = retweet.get('id', '')
         
-        # 获取原微博文本
+        # 交换字段：将当前微博文本存入retweet_text，将原微博文本存入text
+        original_text = weibo['text']  # 保存当前微博文本（即转发时的评论）
+        
+        # 获取原微博文本并存入text
         retweet_text = retweet.get('text', '')
-        weibo['retweet_text'] = re.sub('<[^<]+?>', '', retweet_text).replace('\n', '').strip()
+        weibo['text'] = re.sub('<[^<]+?>', '', retweet_text).replace('\n', '').strip()
+        
+        # 将当前微博文本存入retweet_text
+        weibo['retweet_text'] = original_text
         
         # 获取原微博用户信息
         retweet_user = retweet.get('user', {})
@@ -324,13 +328,15 @@ def save_to_csv(weibo):
     return True
 
 def main():
-    # 获取用户ID和微博ID
-    user_id, weibo_id = extract_ids_from_url(tgt_url)
-    if not user_id or not weibo_id:
-        logger.error(f"无法从URL中提取用户ID和微博ID: {tgt_url}")
+    # 从任务文件获取待处理任务
+    from download_tasks import get_pending_tasks, update_task_status
+    
+    tasks = get_pending_tasks()
+    if not tasks:
+        logger.info("没有待处理的任务")
         return
     
-    logger.info(f"开始爬取用户 {user_id} 的微博 {weibo_id}")
+    logger.info(f"找到 {len(tasks)} 个待处理任务")
     
     # 获取配置
     config = get_config()
@@ -341,23 +347,41 @@ def main():
         logger.error("Cookie为空，请确保配置了有效的cookie")
         return
     
-    # 获取微博数据
-    weibo_data = get_single_weibo(user_id, weibo_id, cookie)
-    if not weibo_data:
-        logger.error("获取微博数据失败")
-        return
-    
-    # 解析微博数据
-    weibo = parse_weibo_data(weibo_data, user_id)
-    if not weibo:
-        logger.error("解析微博数据失败")
-        return
-    
-    # 保存到CSV
-    if save_to_csv(weibo):
-        logger.info(f"微博爬取成功并已保存：{weibo.get('text', '')[:30]}...")
-    else:
-        logger.error("保存微博数据失败")
+    # 处理每个任务
+    for task in tasks:
+        url = task['url']
+        logger.info(f"开始处理任务: {url}")
+        
+        # 获取用户ID和微博ID
+        user_id, weibo_id = extract_ids_from_url(url)
+        if not user_id or not weibo_id:
+            logger.error(f"无法从URL中提取用户ID和微博ID: {url}")
+            update_task_status(url, 'failed')
+            continue
+        
+        logger.info(f"开始爬取用户 {user_id} 的微博 {weibo_id}")
+        
+        # 获取微博数据
+        weibo_data = get_single_weibo(user_id, weibo_id, cookie)
+        if not weibo_data:
+            logger.error("获取微博数据失败")
+            update_task_status(url, 'failed')
+            continue
+        
+        # 解析微博数据
+        weibo = parse_weibo_data(weibo_data, user_id)
+        if not weibo:
+            logger.error("解析微博数据失败")
+            update_task_status(url, 'failed')
+            continue
+        
+        # 保存到CSV
+        if save_to_csv(weibo):
+            logger.info(f"微博爬取成功并已保存：{weibo.get('text', '')[:30]}...")
+            update_task_status(url, 'completed')
+        else:
+            logger.error("保存微博数据失败")
+            update_task_status(url, 'failed')
 
 if __name__ == "__main__":
     main()
