@@ -15,9 +15,25 @@ logging_path = os.path.split(os.path.realpath(__file__))[0] + os.sep + "logging.
 if os.path.exists(logging_path):
     logging.config.fileConfig(logging_path)
 else:
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # 修改默认日志级别为INFO，这样DEBUG级别的日志就不会显示
+    logging.basicConfig(
+        level=logging.INFO, 
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            # 添加文件处理器，将所有日志（包括DEBUG）写入文件
+            logging.FileHandler(os.path.join("log", "weibo.log"), encoding='utf-8'),
+            # 添加控制台处理器，只显示INFO及以上级别的日志
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
 logger = logging.getLogger("weibo")
 
+# 可以单独设置文件处理器的日志级别为DEBUG，这样DEBUG日志仍会写入文件但不会显示在终端
+for handler in logger.handlers:
+    if isinstance(handler, logging.FileHandler):
+        handler.setLevel(logging.DEBUG)
+    elif isinstance(handler, logging.StreamHandler):
+        handler.setLevel(logging.INFO)  # 控制台只显示INFO及以上级别
 
 # 从URL中提取用户ID和微博ID
 def extract_ids_from_url(url):
@@ -55,7 +71,7 @@ def get_cookie(config):
 
 # 获取单条微博
 def get_single_weibo(user_id, weibo_id, cookie):
-    logger.info("使用HTML解析方式获取微博数据")
+    logger.debug("使用HTML解析方式获取微博数据")
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36",
         "Cookie": cookie,
@@ -80,7 +96,7 @@ def get_single_weibo(user_id, weibo_id, cookie):
             try:
                 render_data = json.loads(json_str)
                 if 'status' in render_data:
-                    logger.info("成功从HTML中提取到微博数据")
+                    logger.debug("成功从HTML中提取到微博数据")
                     return render_data['status']
             except json.JSONDecodeError:
                 logger.error("无法解析详情页中的JSON数据")
@@ -230,7 +246,7 @@ def download_image(url, user_id, bid, index, overwrite=False):
                 if chunk:
                     f.write(chunk)
         
-        logger.info(f"图片已{'覆盖' if overwrite and os.path.exists(file_path) else ''}下载到: {file_path}")
+        logger.info(f"图片{'覆盖' if overwrite and os.path.exists(file_path) else ''}下载: {file_path}")
         return relative_path
     except Exception as e:
         logger.error(f"下载图片失败: {e}, URL: {url}")
@@ -310,7 +326,7 @@ def download_video(url, user_id, bid, index, overwrite=False, max_retries=3):
                                     if progress >= last_progress + 20 or progress == 100:
                                         downloaded_mb = downloaded / 1024 / 1024
                                         total_mb = total_size / 1024 / 1024
-                                        logger.info(f"视频下载进度: {progress}%, {downloaded_mb:.2f}MB/{total_mb:.2f}MB")
+                                        logger.debug(f"视频下载进度: {progress}%, {downloaded_mb:.2f}MB/{total_mb:.2f}MB")
                                         last_progress = progress - (progress % 20)
                     
                     # 检查下载是否完整
@@ -319,7 +335,7 @@ def download_video(url, user_id, bid, index, overwrite=False, max_retries=3):
                         if os.path.exists(file_path):
                             os.remove(file_path)
                         os.rename(temp_file_path, file_path)
-                        logger.info(f"视频已{'覆盖' if overwrite and os.path.exists(file_path) else ''}下载到: {file_path}")
+                        logger.info(f"视频{'覆盖' if overwrite and os.path.exists(file_path) else ''}下载: {file_path}")
                         return relative_path
                     else:
                         # 下载不完整，删除临时文件，重试
@@ -413,7 +429,6 @@ def get_best_video_urls(weibo_data):
                         'index': i + 1,  # 保存原始序号，从1开始
                         'is_livephoto': True
                     }
-                    logger.info(f"找到LivePhoto，索引为: {i+1}, URL: {url}")
         
         # 收集每个不同视频的最高清晰度版本
         for video_info in video_groups.values():
@@ -456,7 +471,6 @@ def get_best_video_urls(weibo_data):
         for i, pic in enumerate(weibo_data['pics']):
             if pic.get('type') == 'livephoto' and 'videoSrc' in pic:
                 livephoto_url_to_index[pic['videoSrc']] = i + 1
-                logger.info(f"建立LivePhoto映射: {pic['videoSrc']} -> 索引 {i+1}")
         
         # 处理从get_live_photo获取的LivePhoto列表
         for live_photo_url in live_photo_list:
@@ -470,7 +484,6 @@ def get_best_video_urls(weibo_data):
                 # 首先检查是否在映射中
                 if live_photo_url in livephoto_url_to_index:
                     found_index = livephoto_url_to_index[live_photo_url]
-                    logger.info(f"从映射中找到LivePhoto索引: {found_index}")
                 else:
                     # 如果不在映射中，尝试匹配URL的一部分
                     for i, pic in enumerate(weibo_data['pics']):
@@ -501,7 +514,6 @@ def get_best_video_urls(weibo_data):
                         'index': found_index,
                         'is_livephoto': True
                     })
-                    logger.info(f"LivePhoto与图片索引匹配成功: {found_index}")
                 else:
                     # 如果没找到对应索引，使用连续的索引
                     next_index = len(weibo_data['pics']) + len(video_infos) + 1
@@ -510,7 +522,7 @@ def get_best_video_urls(weibo_data):
                         'index': next_index,
                         'is_livephoto': True
                     })
-                    logger.info(f"LivePhoto未找到对应图片，使用新索引: {next_index}")
+                    logger.warning(f"LivePhoto未找到对应图片，使用新索引: {next_index}")
     
     return video_infos
 
@@ -533,7 +545,7 @@ def get_live_photo(weibo_data):
                 live_photo_url = pic['videoSrc']
                 if live_photo_url and live_photo_url not in live_photo_urls:
                     live_photo_urls.append(live_photo_url)
-                    logger.info(f"从pics[{i}].videoSrc找到LivePhoto URL: {live_photo_url}")
+                    logger.debug(f"从pics[{i}].videoSrc找到LivePhoto URL: {live_photo_url}")
     
     # 如果上面的方法没有找到LivePhoto，尝试其他字段
     if not live_photo_urls:
@@ -565,17 +577,13 @@ def get_live_photo(weibo_data):
             for url in weibo_data['live_photo']:
                 if url and url not in live_photo_urls:
                     live_photo_urls.append(url)
-            logger.info(f"从微博根级别live_photo数组找到LivePhoto URLs: {weibo_data['live_photo']}")
+            logger.debug(f"从微博根级别live_photo数组找到LivePhoto URLs: {weibo_data['live_photo']}")
         elif isinstance(weibo_data['live_photo'], str):
             url = weibo_data['live_photo']
             if url and url not in live_photo_urls:
                 live_photo_urls.append(url)
-            logger.info(f"从微博根级别live_photo字符串找到LivePhoto URL: {url}")
-    
-    # 记录找到的LivePhoto数量
-    if live_photo_urls:
-        logger.info(f"总共找到 {len(live_photo_urls)} 个LivePhoto")
-    
+            logger.debug(f"从微博根级别live_photo字符串找到LivePhoto URL: {url}")
+        
     return live_photo_urls
 
 # 解析微博数据
@@ -591,7 +599,7 @@ def parse_weibo_data(weibo_data, user_id, overwrite_pics=False, overwrite_videos
         debug_file = os.path.join(debug_dir, f"{weibo_data.get('bid', 'unknown')}_data.json")
         with open(debug_file, 'w', encoding='utf-8') as f:
             json.dump(weibo_data, f, ensure_ascii=False, indent=2)
-        logger.info(f"已保存微博数据结构到: {debug_file}")
+        logger.debug(f"已保存微博数据结构到: {debug_file}")
     except Exception as e:
         logger.warning(f"保存调试数据失败: {e}")
     
@@ -889,8 +897,6 @@ def main(ignore_status=False, overwrite_pics=False, overwrite_videos=False):
             logger.error(f"无法从URL中提取用户ID和微博ID: {url}")
             update_task_status(url, 'failed')
             continue
-
-        logger.info(f"开始爬取用户 {user_id} 的微博 {weibo_id}")
 
         # 获取微博数据
         weibo_data = get_single_weibo(user_id, weibo_id, cookie)
