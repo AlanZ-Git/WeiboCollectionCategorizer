@@ -236,11 +236,73 @@ def download_image(url, user_id, bid, index, overwrite=False):
         logger.error(f"下载图片失败: {e}, URL: {url}")
         return None
 
+# 获取视频并选择最高清晰度版本
+def get_best_video_urls(weibo_data):
+    """
+    从微博数据中提取所有视频链接，并为每个不同视频选择最高清晰度版本
+    
+    Args:
+        weibo_data: 微博数据字典
+    
+    Returns:
+        list: 最高清晰度的视频URL列表
+    """
+    # 直接从pics数组中提取视频链接
+    video_urls = []
+    
+    # 检查pics数组中的videoSrc字段
+    if 'pics' in weibo_data and weibo_data['pics']:
+        # 按照视频文件名分组
+        video_groups = {}
+        
+        for pic in weibo_data['pics']:
+            if pic.get('type') == 'video' and 'videoSrc' in pic:
+                url = pic['videoSrc']
+                # 提取视频文件名作为唯一标识
+                video_filename = url.split('/')[-1].split('?')[0]
+                
+                # 提取分辨率
+                resolution = 0
+                if 'template=' in url:
+                    try:
+                        res_part = url.split('template=')[1].split('&')[0]
+                        if 'x' in res_part:
+                            width = int(res_part.split('x')[0])
+                            resolution = width
+                    except:
+                        pass
+                
+                # 如果这个文件名还没有记录，或者当前分辨率更高，则更新
+                if video_filename not in video_groups or resolution > video_groups[video_filename]['resolution']:
+                    video_groups[video_filename] = {
+                        'url': url,
+                        'resolution': resolution
+                    }
+        
+        # 收集每个不同视频的最高清晰度版本
+        for video_info in video_groups.values():
+            video_urls.append(video_info['url'])
+    
+    return video_urls
+
 # 解析微博数据
 def parse_weibo_data(weibo_data, user_id, overwrite_pics=False):
     if not weibo_data:
         return None
-
+        
+    # 添加调试日志，将微博数据结构保存到文件中
+    try:
+        debug_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'debug')
+        if not os.path.isdir(debug_dir):
+            os.makedirs(debug_dir)
+        debug_file = os.path.join(debug_dir, f"{weibo_data.get('bid', 'unknown')}_data.json")
+        with open(debug_file, 'w', encoding='utf-8') as f:
+            json.dump(weibo_data, f, ensure_ascii=False, indent=2)
+        logger.info(f"已保存微博数据结构到: {debug_file}")
+    except Exception as e:
+        logger.warning(f"保存调试数据失败: {e}")
+    
+    # 继续原有代码
     weibo = {}
     weibo['user_id'] = user_id
     weibo['id'] = weibo_data.get('id', '')
@@ -302,11 +364,9 @@ def parse_weibo_data(weibo_data, user_id, overwrite_pics=False):
     # 保存本地图片路径
     weibo['pics'] = ','.join(local_pics)
 
-    # 获取视频
-    weibo['video_url'] = ''
-    if 'page_info' in weibo_data and weibo_data['page_info'] and weibo_data['page_info'].get('type') == 'video':
-        if 'media_info' in weibo_data['page_info'] and 'stream_url' in weibo_data['page_info']['media_info']:
-            weibo['video_url'] = weibo_data['page_info']['media_info']['stream_url']
+    # 获取最高清晰度的视频URL
+    video_urls = get_best_video_urls(weibo_data)
+    weibo['video_url'] = ','.join(video_urls)
 
     # 获取文章链接
     weibo['article_url'] = ''
@@ -405,8 +465,9 @@ def parse_weibo_data(weibo_data, user_id, overwrite_pics=False):
         weibo['pics'] = weibo['retweet_pics']
         weibo['original_pics'] = weibo['original_retweet_pics']
 
-        # 使用 retweet_video_url 的值替换 video_url
-        weibo['video_url'] = weibo['retweet_video_url']
+        # 获取原微博最高清晰度的视频URL
+        retweet_video_urls = get_best_video_urls(retweet)
+        weibo['retweet_video_url'] = ','.join(retweet_video_urls)
 
     return weibo
 
