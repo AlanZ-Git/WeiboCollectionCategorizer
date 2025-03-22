@@ -158,6 +158,44 @@ def get_all_tasks():
         logger.error(f"获取所有任务失败: {str(e)}")
         return []
 
+class FavoritesTask:
+    """收藏微博任务类"""
+    def __init__(self, max_pages=5):
+        self.max_pages = max_pages
+        
+    def run(self):
+        from favorites_crawler import FavoritesCrawler
+        
+        crawler = FavoritesCrawler()
+        favorites = crawler.get_all_favorites(max_pages=self.max_pages)
+        
+        if favorites:
+            filename = crawler.save_to_csv(favorites)
+            return {
+                'status': 'success',
+                'message': f'成功获取 {len(favorites)} 条收藏微博URL',
+                'data': {
+                    'count': len(favorites),
+                    'filename': filename
+                }
+            }
+        else:
+            return {
+                'status': 'error',
+                'message': '获取收藏微博失败或没有收藏微博'
+            }
+
+def create_task(task_type, **kwargs):
+    """创建任务"""
+    # ... 现有代码 ...
+    
+    # 添加收藏微博任务类型
+    if task_type == 'favorites':
+        max_pages = kwargs.get('max_pages', 5)
+        return FavoritesTask(max_pages=max_pages)
+        
+    # ... 现有代码 ...
+
 if __name__ == "__main__":
     # 示例用法
     add_task_interactive()
