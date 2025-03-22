@@ -1,7 +1,8 @@
+import csv
 import json
 import time
 import requests
-import pandas as pd
+
 from datetime import datetime
 import os
 from pathlib import Path
@@ -125,7 +126,7 @@ class FavoritesCrawler:
         print(f"总共获取到 {len(all_favorites)} 条收藏微博")
         return all_favorites
     
-    def save_to_csv(self, data, filename=None):
+    def save_to_csv(self, data: list[str], filename=None):
         """保存收藏微博URL到CSV文件"""
         if not data:
             print("没有收藏微博数据可保存")
@@ -135,8 +136,12 @@ class FavoritesCrawler:
             today = datetime.now().strftime('%Y%m%d')
             filename = f"weibo/favorites_{today}.csv"
             
-        df = pd.DataFrame(data)
-        df.to_csv(filename, index=False, encoding='utf-8-sig')
-        print(f"收藏微博URL已保存到 {filename}")
-        
+        with open(filename, mode='w', newline='', encoding='utf-8-sig') as file:
+            writer = csv.writer(file)
+            # 写标题行（可选，根据数据调整）
+            writer.writerow(['url', 'favorited_time'])  # 假如只存 URL，可以自行修改标题
+            # 写入数据行
+            for row in data:
+                writer.writerow([row['url'], row['favorited_time']])
+
         return filename 
