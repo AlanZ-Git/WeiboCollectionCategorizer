@@ -4,6 +4,7 @@ cookie.json
 # 爬取的数据
 weibo/
 pics/
+videos/
 
 # 日志文件
 log/

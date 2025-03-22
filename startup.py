@@ -236,6 +236,76 @@ def download_image(url, user_id, bid, index, overwrite=False):
         logger.error(f"下载图片失败: {e}, URL: {url}")
         return None
 
+# 下载视频到本地
+def download_video(url, user_id, bid, index, overwrite=False):
+    """
+    下载视频并保存到本地
+    
+    Args:
+        url: 视频URL
+        user_id: 用户ID
+        bid: 微博bid
+        index: 视频序号
+        overwrite: 是否覆盖已存在的文件
+    
+    Returns:
+        保存的相对路径，如果下载失败则返回None
+    """
+    try:
+        # 创建videos目录
+        videos_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'videos')
+        if not os.path.isdir(videos_dir):
+            os.makedirs(videos_dir)
+        
+        # 从URL中获取文件扩展名
+        file_ext = os.path.splitext(url.split('/')[-1].split('?')[0])[1]
+        if not file_ext or len(file_ext) > 5:  # 如果没有扩展名或扩展名异常
+            file_ext = '.mp4'  # 默认使用mp4
+        
+        # 构建文件名和路径
+        filename = f"{user_id}_{bid}_{index}{file_ext}"
+        file_path = os.path.join(videos_dir, filename)
+        relative_path = os.path.join('videos', filename)
+        
+        # 检查文件是否已存在
+        if os.path.exists(file_path) and not overwrite:
+            logger.info(f"视频已存在，跳过下载: {file_path}")
+            return relative_path
+        
+        # 设置请求头，模拟浏览器行为
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36",
+            "Referer": "https://weibo.com/",
+            "Accept": "*/*",
+            "Range": "bytes=0-"  # 支持断点续传
+        }
+        
+        # 下载视频
+        response = requests.get(url, headers=headers, timeout=60, stream=True)
+        response.raise_for_status()
+        
+        # 获取文件大小
+        total_size = int(response.headers.get('content-length', 0))
+        
+        # 保存视频
+        with open(file_path, 'wb') as f:
+            downloaded = 0
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    # 打印下载进度
+                    if total_size > 0:
+                        progress = int(downloaded / total_size * 100)
+                        if progress % 10 == 0:  # 每10%打印一次
+                            logger.info(f"视频下载进度: {progress}%, {downloaded}/{total_size} bytes")
+        
+        logger.info(f"视频已{'覆盖' if overwrite and os.path.exists(file_path) else ''}下载到: {file_path}")
+        return relative_path
+    except Exception as e:
+        logger.error(f"下载视频失败: {e}, URL: {url}")
+        return None
+
 # 获取视频并选择最高清晰度版本
 def get_best_video_urls(weibo_data):
     """
@@ -283,10 +353,25 @@ def get_best_video_urls(weibo_data):
         for video_info in video_groups.values():
             video_urls.append(video_info['url'])
     
+    # 检查page_info中的媒体数据
+    if 'page_info' in weibo_data and weibo_data['page_info']:
+        page_info = weibo_data['page_info']
+        
+        # 检查是否为视频类型
+        if page_info.get('type') == 'video':
+            # 尝试获取高清视频链接
+            media_info = page_info.get('media_info', {})
+            
+            # 按优先级尝试不同的视频源
+            for video_key in ['mp4_hd_url', 'mp4_720p_mp4', 'mp4_1080p_mp4', 'h265_mp4_hd', 'h265_mp4_ld']:
+                if video_key in media_info and media_info[video_key]:
+                    video_urls.append(media_info[video_key])
+                    break
+    
     return video_urls
 
 # 解析微博数据
-def parse_weibo_data(weibo_data, user_id, overwrite_pics=False):
+def parse_weibo_data(weibo_data, user_id, overwrite_pics=False, overwrite_videos=False):
     if not weibo_data:
         return None
         
@@ -364,9 +449,20 @@ def parse_weibo_data(weibo_data, user_id, overwrite_pics=False):
     # 保存本地图片路径
     weibo['pics'] = ','.join(local_pics)
 
-    # 获取最高清晰度的视频URL
+    # 获取最高清晰度的视频URL并下载
     video_urls = get_best_video_urls(weibo_data)
-    weibo['video_url'] = ','.join(video_urls)
+    local_videos = []
+    
+    # 下载视频
+    for i, video_url in enumerate(video_urls):
+        local_path = download_video(video_url, user_id, weibo['bid'], i+1, overwrite=overwrite_videos)
+        if local_path:
+            local_videos.append(local_path)
+    
+    # 保存原始视频URL（用于调试）
+    weibo['original_videos'] = ','.join(video_urls)
+    # 保存本地视频路径
+    weibo['videos'] = ','.join(local_videos)
 
     # 获取文章链接
     weibo['article_url'] = ''
@@ -384,7 +480,7 @@ def parse_weibo_data(weibo_data, user_id, overwrite_pics=False):
     weibo['retweet_screen_name'] = ''
     weibo['retweet_user_id'] = ''
     weibo['retweet_pics'] = ''
-    weibo['retweet_video_url'] = ''
+    weibo['retweet_videos'] = ''  # 修改字段名
     weibo['retweet_source_url'] = ''
 
     # 添加源URL - 先在这里定义，确保后面交换时它已存在
@@ -465,9 +561,24 @@ def parse_weibo_data(weibo_data, user_id, overwrite_pics=False):
         weibo['pics'] = weibo['retweet_pics']
         weibo['original_pics'] = weibo['original_retweet_pics']
 
-        # 获取原微博最高清晰度的视频URL
+        # 获取原微博最高清晰度的视频URL并下载
         retweet_video_urls = get_best_video_urls(retweet)
-        weibo['retweet_video_url'] = ','.join(retweet_video_urls)
+        retweet_local_videos = []
+        
+        # 下载原微博视频
+        for i, video_url in enumerate(retweet_video_urls):
+            local_path = download_video(video_url, weibo['retweet_user_id'], retweet.get('bid', ''), i+1, overwrite=overwrite_videos)
+            if local_path:
+                retweet_local_videos.append(local_path)
+        
+        # 保存原始视频URL（用于调试）
+        weibo['original_retweet_videos'] = ','.join(retweet_video_urls)
+        # 保存本地视频路径
+        weibo['retweet_videos'] = ','.join(retweet_local_videos)
+
+        # 使用 retweet_videos 的值替换 videos
+        weibo['videos'] = weibo['retweet_videos']
+        weibo['original_videos'] = weibo['original_retweet_videos']
 
     return weibo
 
@@ -486,7 +597,7 @@ def save_to_csv(weibo):
 
     headers = [
         'id', 'bid', 'user_id', 'screen_name', 'text', 'article_url', 'topics',
-        'pics', 'video_url', 'source_url', 'retweet_id', 'retweet_text',
+        'pics', 'videos', 'source_url', 'retweet_id', 'retweet_text',
         'retweet_screen_name', 'retweet_user_id', 'retweet_source_url'
     ]
 
@@ -516,7 +627,7 @@ def get_pending_tasks(ignore_status=False):
     from download_tasks import get_pending_tasks
     return get_pending_tasks(ignore_status)
 
-def main(ignore_status=False, overwrite_pics=False):
+def main(ignore_status=False, overwrite_pics=False, overwrite_videos=False):
     # 从任务文件获取待处理任务
     from download_tasks import update_task_status
 
@@ -558,7 +669,7 @@ def main(ignore_status=False, overwrite_pics=False):
             continue
 
         # 解析微博数据
-        weibo = parse_weibo_data(weibo_data, user_id, overwrite_pics=overwrite_pics)
+        weibo = parse_weibo_data(weibo_data, user_id, overwrite_pics=overwrite_pics, overwrite_videos=overwrite_videos)
         if not weibo:
             logger.error("解析微博数据失败")
             update_task_status(url, 'failed')
@@ -576,6 +687,7 @@ if __name__ == "__main__":
     # 检查命令行参数
     ignore_status = True
     overwrite_pics = True
+    overwrite_videos = True
     
     for arg in sys.argv[1:]:
         if arg == '--ignore-status':
@@ -584,5 +696,8 @@ if __name__ == "__main__":
         elif arg == '--overwrite-pics':
             overwrite_pics = True
             logger.info("启用图片覆盖模式，将重新下载所有图片")
+        elif arg == '--overwrite-videos':
+            overwrite_videos = True
+            logger.info("启用视频覆盖模式，将重新下载所有视频")
 
-    main(ignore_status, overwrite_pics)
+    main(ignore_status, overwrite_pics, overwrite_videos)
