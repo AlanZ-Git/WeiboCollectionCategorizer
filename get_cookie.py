@@ -29,14 +29,14 @@ def print_instructions():
     print(instructions)
 
 def save_cookie(cookie):
-    """保存Cookie到单独的cookie.json文件"""
+    """保存Cookie到单独的setting.json文件"""
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    cookie_path = os.path.join(base_dir, 'cookie.json')
+    cookie_path = os.path.join(base_dir, 'setting.json')
     
     # 创建Cookie数据
     cookie_data = {"cookie": cookie}
     
-    # 保存Cookie到cookie.json
+    # 保存Cookie到setting.json
     try:
         with open(cookie_path, 'w', encoding='utf-8') as f:
             json.dump(cookie_data, f, ensure_ascii=False, indent=4)
@@ -69,9 +69,9 @@ def get_cookie_interactive():
         return None
 
 def load_cookie():
-    """从cookie.json文件加载Cookie"""
+    """从setting.json文件加载Cookie"""
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    cookie_path = os.path.join(base_dir, 'cookie.json')
+    cookie_path = os.path.join(base_dir, 'setting.json')
     
     try:
         if os.path.exists(cookie_path):

@@ -13,6 +13,7 @@ from weibo_parser import parse_weibo_data  # 从新的weibo_parser.py导入函�
 from data_storage import save_to_csv  # 从新的data_storage.py导入函数
 from task_manager import get_pending_tasks, update_task_status, create_task, add_task  # 从新的task_manager.py导入函数
 from get_cookie import get_cookie_interactive, load_cookie  # 导入cookie获取函数
+from path_manager import get_download_path, create_download_directories  # 导入路径管理函数
 import argparse
 import pandas as pd
 
@@ -20,6 +21,10 @@ import pandas as pd
 logger = setup_logger()
 
 def main(ignore_status=False, overwrite_pics=False, overwrite_videos=False):
+    # 获取下载路径
+    download_paths = create_download_directories(get_download_path())
+    logger.info(f"下载路径设置为: {download_paths['base']}")
+
     # 从任务文件获取待处理任务
     tasks = get_pending_tasks(ignore_status)
     if not tasks:
@@ -32,9 +37,9 @@ def main(ignore_status=False, overwrite_pics=False, overwrite_videos=False):
     config = get_config()
     cookie = get_cookie(config)
 
-    # 检查cookie是否为空，如果为空则尝试从cookie.json加载或交互式获取
+    # 检查cookie是否为空，如果为空则尝试从setting.json加载或交互式获取
     if not cookie:
-        logger.warning("配置中的Cookie为空，尝试从cookie.json加载")
+        logger.warning("配置中的Cookie为空，尝试从setting.json加载")
         cookie = load_cookie()
         
         # 如果仍然为空，则交互式获取

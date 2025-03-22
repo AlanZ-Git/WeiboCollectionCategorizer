@@ -3,6 +3,7 @@ import re
 import json
 import logging
 from media_downloader import download_image, download_video
+from path_manager import get_download_path, create_download_directories
 
 logger = logging.getLogger(__name__)
 
@@ -221,9 +222,12 @@ def parse_weibo_data(weibo_data, user_id, overwrite_pics=False, overwrite_videos
     if not weibo_data:
         return None
         
+    # 获取下载路径
+    download_paths = create_download_directories(get_download_path())
+    debug_dir = os.path.join(download_paths['base'], 'debug')
+        
     # 添加调试日志，将微博数据结构保存到文件中
     try:
-        debug_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'debug')
         if not os.path.isdir(debug_dir):
             os.makedirs(debug_dir)
         debug_file = os.path.join(debug_dir, f"{weibo_data.get('bid', 'unknown')}_data.json")

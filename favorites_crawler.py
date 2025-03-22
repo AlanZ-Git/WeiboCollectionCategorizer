@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 class FavoritesCrawler:
-    def __init__(self, cookie_path='cookie.json'):
+    def __init__(self, cookie_path='setting.json'):
         # 加载cookie
         with open(cookie_path, 'r', encoding='utf-8') as f:
             self.cookie = json.load(f)

@@ -13,7 +13,7 @@ def get_config():
     """
     # 默认配置
     return {
-        "cookie_path": "cookie.json"
+        "cookie_path": "setting.json"
     }
 
 def get_cookie(config):

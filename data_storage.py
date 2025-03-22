@@ -2,6 +2,7 @@ import os
 import csv
 from datetime import datetime
 from logger import setup_logger
+from path_manager import get_download_path, create_download_directories
 
 # 初始化日志
 logger = setup_logger()
@@ -19,9 +20,9 @@ def save_to_csv(weibo):
     if not weibo:
         return False
 
-    file_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'weibo')
-    if not os.path.isdir(file_dir):
-        os.makedirs(file_dir)
+    # 获取下载路径
+    download_paths = create_download_directories(get_download_path())
+    file_dir = download_paths['weibo']
 
     # 使用当天日期作为文件名
     today = datetime.now().strftime('%Y%m%d')

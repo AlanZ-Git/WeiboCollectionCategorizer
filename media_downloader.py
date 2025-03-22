@@ -1,6 +1,7 @@
 import os
 import requests
 from logger import setup_logger
+from path_manager import get_download_path, create_download_directories
 
 # 初始化日志
 logger = setup_logger()
@@ -8,9 +9,9 @@ logger = setup_logger()
 def download_image(url, user_id, bid, index, overwrite=False):
     """下载图片并保存到本地"""
     try:
-        media_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'media')
-        if not os.path.isdir(media_dir):
-            os.makedirs(media_dir)
+        # 获取下载路径
+        download_paths = create_download_directories(get_download_path())
+        media_dir = download_paths['media']
         
         file_ext = os.path.splitext(url.split('/')[-1])[1]
         if not file_ext or len(file_ext) > 5:
@@ -47,9 +48,9 @@ def download_image(url, user_id, bid, index, overwrite=False):
 def download_video(url, user_id, bid, index, overwrite=False, max_retries=3):
     """下载视频并保存到本地"""
     try:
-        media_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'media')
-        if not os.path.isdir(media_dir):
-            os.makedirs(media_dir)
+        # 获取下载路径
+        download_paths = create_download_directories(get_download_path())
+        media_dir = download_paths['media']
         
         file_ext = os.path.splitext(url.split('/')[-1].split('?')[0])[1]
         if not file_ext or len(file_ext) > 5:

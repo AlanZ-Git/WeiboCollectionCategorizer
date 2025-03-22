@@ -1,5 +1,5 @@
 # 个人敏感信息
-cookie.json
+setting.json
 
 # 爬取的数据
 weibo/
@@ -18,4 +18,4 @@ __pycache__/
 .vscode/
 
 # 下载任务
-download_tasks.csv
+download_tasks*
