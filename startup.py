@@ -193,10 +193,10 @@ def download_image(url, user_id, bid, index, overwrite=False):
         保存的相对路径，如果下载失败则返回None
     """
     try:
-        # 创建pics目录
-        pics_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pics')
-        if not os.path.isdir(pics_dir):
-            os.makedirs(pics_dir)
+        # 创建media目录
+        media_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'media')
+        if not os.path.isdir(media_dir):
+            os.makedirs(media_dir)
         
         # 从URL中获取文件扩展名
         file_ext = os.path.splitext(url.split('/')[-1])[1]
@@ -205,8 +205,8 @@ def download_image(url, user_id, bid, index, overwrite=False):
         
         # 构建文件名和路径
         filename = f"{user_id}_{bid}_{index}{file_ext}"
-        file_path = os.path.join(pics_dir, filename)
-        relative_path = os.path.join('pics', filename)
+        file_path = os.path.join(media_dir, filename)
+        relative_path = os.path.join('media', filename)
         
         # 检查文件是否已存在
         if os.path.exists(file_path) and not overwrite:
@@ -237,7 +237,7 @@ def download_image(url, user_id, bid, index, overwrite=False):
         return None
 
 # 下载视频到本地
-def download_video(url, user_id, bid, index, overwrite=False):
+def download_video(url, user_id, bid, index, overwrite=False, max_retries=3):
     """
     下载视频并保存到本地
     
@@ -247,15 +247,16 @@ def download_video(url, user_id, bid, index, overwrite=False):
         bid: 微博bid
         index: 视频序号
         overwrite: 是否覆盖已存在的文件
+        max_retries: 最大重试次数
     
     Returns:
         保存的相对路径，如果下载失败则返回None
     """
     try:
-        # 创建videos目录
-        videos_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'videos')
-        if not os.path.isdir(videos_dir):
-            os.makedirs(videos_dir)
+        # 创建media目录
+        media_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'media')
+        if not os.path.isdir(media_dir):
+            os.makedirs(media_dir)
         
         # 从URL中获取文件扩展名
         file_ext = os.path.splitext(url.split('/')[-1].split('?')[0])[1]
@@ -264,8 +265,8 @@ def download_video(url, user_id, bid, index, overwrite=False):
         
         # 构建文件名和路径
         filename = f"{user_id}_{bid}_{index}{file_ext}"
-        file_path = os.path.join(videos_dir, filename)
-        relative_path = os.path.join('videos', filename)
+        file_path = os.path.join(media_dir, filename)
+        relative_path = os.path.join('media', filename)
         
         # 检查文件是否已存在
         if os.path.exists(file_path) and not overwrite:
@@ -280,30 +281,92 @@ def download_video(url, user_id, bid, index, overwrite=False):
             "Range": "bytes=0-"  # 支持断点续传
         }
         
-        # 下载视频
-        response = requests.get(url, headers=headers, timeout=60, stream=True)
-        response.raise_for_status()
+        # 实现重试机制
+        retry_count = 0
+        while retry_count < max_retries:
+            try:
+                # 下载视频
+                with requests.get(url, headers=headers, timeout=60, stream=True) as response:
+                    response.raise_for_status()
+                    
+                    # 获取文件大小
+                    total_size = int(response.headers.get('content-length', 0))
+                    
+                    # 创建临时文件
+                    temp_file_path = file_path + ".tmp"
+                    
+                    # 保存视频
+                    with open(temp_file_path, 'wb') as f:
+                        downloaded = 0
+                        last_progress = 0
+                        for chunk in response.iter_content(chunk_size=8192):
+                            if chunk:
+                                f.write(chunk)
+                                downloaded += len(chunk)
+                                # 打印下载进度
+                                if total_size > 0:
+                                    progress = int(downloaded / total_size * 100)
+                                    # 每20%打印一次
+                                    if progress >= last_progress + 20 or progress == 100:
+                                        downloaded_mb = downloaded / 1024 / 1024
+                                        total_mb = total_size / 1024 / 1024
+                                        logger.info(f"视频下载进度: {progress}%, {downloaded_mb:.2f}MB/{total_mb:.2f}MB")
+                                        last_progress = progress - (progress % 20)
+                    
+                    # 检查下载是否完整
+                    if os.path.getsize(temp_file_path) == total_size or total_size == 0:
+                        # 下载完成，重命名临时文件
+                        if os.path.exists(file_path):
+                            os.remove(file_path)
+                        os.rename(temp_file_path, file_path)
+                        logger.info(f"视频已{'覆盖' if overwrite and os.path.exists(file_path) else ''}下载到: {file_path}")
+                        return relative_path
+                    else:
+                        # 下载不完整，删除临时文件，重试
+                        os.remove(temp_file_path)
+                        logger.warning(f"视频下载不完整，将重试 ({retry_count+1}/{max_retries})")
+                        retry_count += 1
+                        # 短暂延迟后重试
+                        import time
+                        time.sleep(2)
+                        continue
+                
+                # 如果执行到这里，说明下载成功
+                break
+                
+            except requests.exceptions.SSLError as ssl_err:
+                logger.warning(f"SSL错误，将重试 ({retry_count+1}/{max_retries}): {ssl_err}")
+                retry_count += 1
+                if retry_count >= max_retries:
+                    raise
+                # 短暂延迟后重试
+                import time
+                time.sleep(2)
+            
+            except requests.exceptions.RequestException as req_err:
+                logger.warning(f"请求错误，将重试 ({retry_count+1}/{max_retries}): {req_err}")
+                retry_count += 1
+                if retry_count >= max_retries:
+                    raise
+                # 短暂延迟后重试
+                import time
+                time.sleep(2)
         
-        # 获取文件大小
-        total_size = int(response.headers.get('content-length', 0))
-        
-        # 保存视频
-        with open(file_path, 'wb') as f:
-            downloaded = 0
-            for chunk in response.iter_content(chunk_size=8192):
-                if chunk:
-                    f.write(chunk)
-                    downloaded += len(chunk)
-                    # 打印下载进度
-                    if total_size > 0:
-                        progress = int(downloaded / total_size * 100)
-                        if progress % 10 == 0:  # 每10%打印一次
-                            logger.info(f"视频下载进度: {progress}%, {downloaded}/{total_size} bytes")
-        
-        logger.info(f"视频已{'覆盖' if overwrite and os.path.exists(file_path) else ''}下载到: {file_path}")
+        # 如果重试次数用完仍然失败
+        if retry_count >= max_retries:
+            logger.error(f"视频下载失败，已达到最大重试次数: {max_retries}")
+            return None
+            
         return relative_path
     except Exception as e:
         logger.error(f"下载视频失败: {e}, URL: {url}")
+        # 清理可能存在的临时文件
+        temp_file_path = file_path + ".tmp"
+        if os.path.exists(temp_file_path):
+            try:
+                os.remove(temp_file_path)
+            except:
+                pass
         return None
 
 # 获取视频并选择最高清晰度版本
@@ -315,17 +378,17 @@ def get_best_video_urls(weibo_data):
         weibo_data: 微博数据字典
     
     Returns:
-        list: 最高清晰度的视频URL列表
+        list: 包含视频信息的字典列表，每个字典包含url和index(原始序号)
     """
     # 直接从pics数组中提取视频链接
-    video_urls = []
+    video_infos = []
     
     # 检查pics数组中的videoSrc字段
     if 'pics' in weibo_data and weibo_data['pics']:
         # 按照视频文件名分组
         video_groups = {}
         
-        for pic in weibo_data['pics']:
+        for i, pic in enumerate(weibo_data['pics']):
             if pic.get('type') == 'video' and 'videoSrc' in pic:
                 url = pic['videoSrc']
                 # 提取视频文件名作为唯一标识
@@ -346,12 +409,16 @@ def get_best_video_urls(weibo_data):
                 if video_filename not in video_groups or resolution > video_groups[video_filename]['resolution']:
                     video_groups[video_filename] = {
                         'url': url,
-                        'resolution': resolution
+                        'resolution': resolution,
+                        'index': i + 1  # 保存原始序号，从1开始
                     }
         
         # 收集每个不同视频的最高清晰度版本
         for video_info in video_groups.values():
-            video_urls.append(video_info['url'])
+            video_infos.append({
+                'url': video_info['url'],
+                'index': video_info['index']
+            })
     
     # 检查page_info中的媒体数据
     if 'page_info' in weibo_data and weibo_data['page_info']:
@@ -365,10 +432,15 @@ def get_best_video_urls(weibo_data):
             # 按优先级尝试不同的视频源
             for video_key in ['mp4_hd_url', 'mp4_720p_mp4', 'mp4_1080p_mp4', 'h265_mp4_hd', 'h265_mp4_ld']:
                 if video_key in media_info and media_info[video_key]:
-                    video_urls.append(media_info[video_key])
+                    # 对于page_info中的视频，我们使用0作为特殊索引
+                    # 因为它通常是主视频而不是图片列表中的视频
+                    video_infos.append({
+                        'url': media_info[video_key],
+                        'index': 0
+                    })
                     break
     
-    return video_urls
+    return video_infos
 
 # 解析微博数据
 def parse_weibo_data(weibo_data, user_id, overwrite_pics=False, overwrite_videos=False):
@@ -430,17 +502,47 @@ def parse_weibo_data(weibo_data, user_id, overwrite_pics=False, overwrite_videos
     # 清理其他HTML标签
     weibo['text'] = re.sub('<[^<]+?>', '', text).replace('\n', '').strip()
 
+    # 检查是否为转发微博
+    is_retweet = 'retweeted_status' in weibo_data and weibo_data['retweeted_status']
+    
+    # 如果是转发微博，先获取原微博信息
+    original_user_id = None
+    original_bid = None
+    
+    if is_retweet:
+        retweet = weibo_data['retweeted_status']
+        retweet_user = retweet.get('user', {})
+        if retweet_user is not None:
+            original_user_id = retweet_user.get('id', '')
+        else:
+            original_user_id = ''
+        original_bid = retweet.get('bid', '')
+    
     # 获取图片
     pics = []
     local_pics = []
-    if 'pics' in weibo_data and weibo_data['pics']:
+    
+    # 如果是转发微博，只处理原微博的图片
+    if is_retweet and 'pics' in weibo_data['retweeted_status'] and weibo_data['retweeted_status']['pics']:
+        retweet = weibo_data['retweeted_status']
+        for i, pic in enumerate(retweet['pics']):
+            if 'large' in pic and 'url' in pic['large']:
+                pic_url = pic['large']['url']
+                pics.append(pic_url)
+                
+                # 下载图片并获取本地路径 - 使用原微博的user_id和bid
+                local_path = download_image(pic_url, original_user_id, original_bid, i+1, overwrite=overwrite_pics)
+                if local_path:
+                    local_pics.append(local_path)
+    # 否则处理当前微博的图片
+    elif 'pics' in weibo_data and weibo_data['pics']:
         for i, pic in enumerate(weibo_data['pics']):
             if 'large' in pic and 'url' in pic['large']:
                 pic_url = pic['large']['url']
                 pics.append(pic_url)
                 
                 # 下载图片并获取本地路径
-                local_path = download_image(pic_url, user_id, weibo['bid'], i+1, overwrite=overwrite_pics)
+                local_path = download_image(pic_url, user_id, weibo_data.get('bid', ''), i+1, overwrite=overwrite_pics)
                 if local_path:
                     local_pics.append(local_path)
     
@@ -449,18 +551,28 @@ def parse_weibo_data(weibo_data, user_id, overwrite_pics=False, overwrite_videos
     # 保存本地图片路径
     weibo['pics'] = ','.join(local_pics)
 
-    # 获取最高清晰度的视频URL并下载
-    video_urls = get_best_video_urls(weibo_data)
+    # 获取视频
+    video_infos = []
     local_videos = []
     
-    # 下载视频
-    for i, video_url in enumerate(video_urls):
-        local_path = download_video(video_url, user_id, weibo['bid'], i+1, overwrite=overwrite_videos)
-        if local_path:
-            local_videos.append(local_path)
+    # 如果是转发微博，只处理原微博的视频
+    if is_retweet:
+        video_infos = get_best_video_urls(weibo_data['retweeted_status'])
+        for video_info in video_infos:
+            # 使用原始序号下载视频
+            local_path = download_video(video_info['url'], original_user_id, original_bid, video_info['index'], overwrite=overwrite_videos)
+            if local_path:
+                local_videos.append(local_path)
+    else:
+        video_infos = get_best_video_urls(weibo_data)
+        for video_info in video_infos:
+            # 使用原始序号下载视频
+            local_path = download_video(video_info['url'], user_id, weibo_data.get('bid', ''), video_info['index'], overwrite=overwrite_videos)
+            if local_path:
+                local_videos.append(local_path)
     
     # 保存原始视频URL（用于调试）
-    weibo['original_videos'] = ','.join(video_urls)
+    weibo['original_videos'] = ','.join([info['url'] for info in video_infos])
     # 保存本地视频路径
     weibo['videos'] = ','.join(local_videos)
 
@@ -486,7 +598,7 @@ def parse_weibo_data(weibo_data, user_id, overwrite_pics=False, overwrite_videos
     # 添加源URL - 先在这里定义，确保后面交换时它已存在
     weibo['source_url'] = f"https://weibo.com/{user_id}/{weibo['bid']}"
 
-    if 'retweeted_status' in weibo_data and weibo_data['retweeted_status']:
+    if is_retweet:
         retweet = weibo_data['retweeted_status']
         weibo['retweet_id'] = retweet.get('id', '')
 
@@ -515,24 +627,9 @@ def parse_weibo_data(weibo_data, user_id, overwrite_pics=False, overwrite_videos
             weibo['retweet_screen_name'] = '已删除'
             weibo['retweet_user_id'] = ''
 
-        # 获取原微博图片
-        retweet_pics = []
-        retweet_local_pics = []
-        if 'pics' in retweet and retweet['pics']:
-            for i, pic in enumerate(retweet['pics']):
-                if 'large' in pic and 'url' in pic['large']:
-                    pic_url = pic['large']['url']
-                    retweet_pics.append(pic_url)
-                    
-                    # 下载图片并获取本地路径
-                    local_path = download_image(pic_url, weibo['retweet_user_id'], retweet.get('bid', ''), i+1, overwrite=overwrite_pics)
-                    if local_path:
-                        retweet_local_pics.append(local_path)
-        
-        # 保存原始图片URL（用于调试）
-        weibo['original_retweet_pics'] = ','.join(retweet_pics)
+        # 获取原微博图片 - 这里不再重复下载图片，直接使用之前下载的图片
         # 保存本地图片路径
-        weibo['retweet_pics'] = ','.join(retweet_local_pics)
+        weibo['retweet_pics'] = ','.join(local_pics)
 
         # 添加原微博源URL
         if weibo['retweet_user_id'] and retweet.get('bid', ''):
@@ -559,26 +656,12 @@ def parse_weibo_data(weibo_data, user_id, overwrite_pics=False, overwrite_videos
 
         # 使用 retweet_pics 的值替换 pics
         weibo['pics'] = weibo['retweet_pics']
-        weibo['original_pics'] = weibo['original_retweet_pics']
 
-        # 获取原微博最高清晰度的视频URL并下载
-        retweet_video_urls = get_best_video_urls(retweet)
-        retweet_local_videos = []
-        
-        # 下载原微博视频
-        for i, video_url in enumerate(retweet_video_urls):
-            local_path = download_video(video_url, weibo['retweet_user_id'], retweet.get('bid', ''), i+1, overwrite=overwrite_videos)
-            if local_path:
-                retweet_local_videos.append(local_path)
-        
-        # 保存原始视频URL（用于调试）
-        weibo['original_retweet_videos'] = ','.join(retweet_video_urls)
-        # 保存本地视频路径
-        weibo['retweet_videos'] = ','.join(retweet_local_videos)
+        # 保存本地视频路径 - 直接使用之前下载的视频路径
+        weibo['retweet_videos'] = ','.join(local_videos)
 
         # 使用 retweet_videos 的值替换 videos
         weibo['videos'] = weibo['retweet_videos']
-        weibo['original_videos'] = weibo['original_retweet_videos']
 
     return weibo
 
