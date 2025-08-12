@@ -9,14 +9,14 @@ import argparse
 import sys
 import csv
 
-from config import get_config, get_cookie  # 从config.py导入配置函数
-from logger import setup_logger  # 导入新的日志模块
-from weibo_api import extract_ids_from_url, get_single_weibo  # 从weibo_api.py导入函数
-from weibo_parser import parse_weibo_data  # 从新的weibo_parser.py导入函数
-from data_storage import save_to_csv  # 从新的data_storage.py导入函数
-from task_manager import get_pending_tasks, update_task_status, create_task, add_task  # 从新的task_manager.py导入函数
-from get_cookie import get_cookie_interactive, load_cookie  # 导入cookie获取函数
-from path_manager import get_download_path, create_download_directories  # 导入路径管理函数
+from lib.config import get_config, get_cookie  # 从config.py导入配置函数
+from lib.logger import setup_logger  # 导入新的日志模块
+from lib.weibo_api import extract_ids_from_url, get_single_weibo  # 从weibo_api.py导入函数
+from lib.weibo_parser import parse_weibo_data  # 从新的weibo_parser.py导入函数
+from lib.data_storage import save_to_csv  # 从新的data_storage.py导入函数
+from lib.task_manager import get_pending_tasks, update_task_status, create_task, add_task  # 从新的task_manager.py导入函数
+from lib.get_cookie import get_cookie_interactive, load_cookie  # 导入cookie获取函数
+from lib.path_manager import get_download_path, create_download_directories  # 导入路径管理函数
 
 
 # 初始化日志

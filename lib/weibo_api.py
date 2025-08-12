@@ -1,7 +1,7 @@
 import re
 import json
 import requests
-from logger import setup_logger  # 导入日志模块
+from .logger import setup_logger  # 导入日志模块
 
 # 初始化日志
 logger = setup_logger()

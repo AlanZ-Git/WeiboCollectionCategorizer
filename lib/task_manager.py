@@ -3,7 +3,9 @@
 import os
 import csv
 from datetime import datetime
-from logger import setup_logger
+
+from .logger import setup_logger
+from .favorites_crawler import FavoritesCrawler
 
 # 初始化日志
 logger = setup_logger()
@@ -164,8 +166,6 @@ class FavoritesTask:
         self.max_pages = max_pages
 
     def run(self):
-        from favorites_crawler import FavoritesCrawler
-
         crawler = FavoritesCrawler()
         favorites = crawler.get_all_favorites(max_pages=self.max_pages)
 

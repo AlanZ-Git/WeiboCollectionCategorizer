@@ -1,8 +1,8 @@
 import os
 import csv
 from datetime import datetime
-from logger import setup_logger
-from path_manager import get_download_path, create_download_directories
+from .logger import setup_logger
+from .path_manager import get_download_path, create_download_directories
 
 # 初始化日志
 logger = setup_logger()

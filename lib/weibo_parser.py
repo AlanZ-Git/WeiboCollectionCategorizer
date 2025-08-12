@@ -2,8 +2,8 @@ import os
 import re
 import json
 import logging
-from media_downloader import download_image, download_video
-from path_manager import get_download_path, create_download_directories
+from .media_downloader import download_image, download_video
+from .path_manager import get_download_path, create_download_directories
 
 logger = logging.getLogger(__name__)
 
