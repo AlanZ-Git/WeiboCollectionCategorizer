@@ -28,9 +28,21 @@ def save_to_csv(weibo):
     file_path = os.path.join(file_dir, f"{today}.csv")
 
     headers = [
-        'id', 'bid', 'user_id', 'screen_name', 'text', 'article_url', 'topics',
-        'pics', 'videos', 'source_url', 'retweet_id', 'retweet_text',
-        'retweet_screen_name', 'retweet_user_id', 'retweet_source_url'
+        'id',                    # 微博ID（数字格式）
+        'bid',                   # 微博BID（字符串格式，用于URL）
+        'user_id',               # 用户ID（数字格式）
+        'screen_name',           # 用户昵称
+        'text',                  # 微博正文内容
+        'article_url',           # 文章链接（如果有的话）
+        'topics',                # 话题标签（用逗号分隔）
+        'pics',                  # 图片本地路径（用逗号分隔）
+        'videos',                # 视频本地路径（用逗号分隔）
+        'source_url',            # 微博源链接
+        'retweet_id',            # 转发微博ID
+        'retweet_text',          # 转发微博内容
+        'retweet_screen_name',   # 转发微博用户昵称
+        'retweet_user_id',       # 转发微博用户ID
+        'retweet_source_url'     # 转发微博源链接
     ]
 
     is_file_exist = os.path.isfile(file_path)
