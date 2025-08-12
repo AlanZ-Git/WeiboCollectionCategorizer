@@ -1,7 +1,7 @@
 import os
 import requests
 
-from path_manager import get_download_path, create_download_directories
+from .path_manager import get_download_path, create_download_directories
 from .logger import setup_logger
 logger = setup_logger()
 
