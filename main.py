@@ -10,17 +10,15 @@ import sys
 import csv
 
 from lib.config import get_config, get_cookie  # 从config.py导入配置函数
-from lib.logger import setup_logger  # 导入新的日志模块
 from lib.weibo_api import extract_ids_from_url, get_single_weibo  # 从weibo_api.py导入函数
 from lib.weibo_parser import parse_weibo_data  # 从新的weibo_parser.py导入函数
 from lib.data_storage import save_to_csv  # 从新的data_storage.py导入函数
 from lib.task_manager import get_pending_tasks, update_task_status, create_task, add_task  # 从新的task_manager.py导入函数
 from lib.get_cookie import get_cookie_interactive, load_cookie  # 导入cookie获取函数
 from lib.path_manager import get_download_path, create_download_directories  # 导入路径管理函数
+from lib.logger import setup_logger
+logger = setup_logger('weibo')
 
-
-# 初始化日志
-logger = setup_logger()
 
 def main(ignore_status=False, overwrite_pics=False, overwrite_videos=False):
     # 获取下载路径
@@ -90,14 +88,14 @@ def main(ignore_status=False, overwrite_pics=False, overwrite_videos=False):
 
 def fetch_favorites(max_pages=5, add_to_tasks=False):
     """获取收藏微博"""
-    print("开始获取收藏微博...")
+    logger.info("开始获取收藏微博...")
 
     task = create_task('favorites', max_pages=max_pages)
     result = task.run()
 
     if result['status'] == 'success':
-        print(result['message'])
-        print(f"数据已保存到: {result['data']['filename']}")
+        logger.info(result['message'])
+        logger.info(f"数据已保存到: {result['data']['filename']}")
 
         # 如果需要将URL添加到下载任务
         if add_to_tasks:
@@ -112,9 +110,9 @@ def fetch_favorites(max_pages=5, add_to_tasks=False):
                 if add_task(url, notes='从收藏微博自动添加'):
                     added_count += 1
 
-            print(f"已将 {added_count} 个收藏微博URL添加到下载任务")
+            logger.info(f"已将 {added_count} 个收藏微博URL添加到下载任务")
     else:
-        print(f"获取收藏微博失败: {result['message']}")
+        logger.error(f"获取收藏微博失败: {result['message']}")
 
     return result
 

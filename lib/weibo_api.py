@@ -1,9 +1,8 @@
 import re
 import json
 import requests
-from .logger import setup_logger  # 导入日志模块
 
-# 初始化日志
+from .logger import setup_logger
 logger = setup_logger()
 
 # 从URL中提取用户ID和微博ID

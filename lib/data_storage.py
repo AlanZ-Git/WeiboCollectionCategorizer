@@ -1,10 +1,9 @@
 import os
 import csv
 from datetime import datetime
-from .logger import setup_logger
-from .path_manager import get_download_path, create_download_directories
 
-# 初始化日志
+from .path_manager import get_download_path, create_download_directories
+from .logger import setup_logger
 logger = setup_logger()
 
 def save_to_csv(weibo):

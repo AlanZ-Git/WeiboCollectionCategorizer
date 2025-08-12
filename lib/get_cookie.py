@@ -1,11 +1,8 @@
 import os
 import json
-import sys
-import logging
 
-# 设置日志
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger("weibo-cookie")
+from .logger import setup_logger
+logger = setup_logger()
 
 def print_instructions():
     """打印获取Cookie的详细指导"""

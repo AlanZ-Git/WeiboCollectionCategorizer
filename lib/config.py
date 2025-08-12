@@ -1,8 +1,8 @@
 import os
 import json
-import logging
 
-logger = logging.getLogger("weibo")
+from .logger import setup_logger
+logger = setup_logger()
 
 def get_config():
     """
@@ -39,4 +39,4 @@ def get_cookie(config):
                 logger.error(f"读取cookie文件出错: {e}")
 
     logger.warning("未找到有效的cookie配置")
-    return "" 
+    return ""

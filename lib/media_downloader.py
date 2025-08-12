@@ -1,9 +1,8 @@
 import os
 import requests
-from logger import setup_logger
-from path_manager import get_download_path, create_download_directories
 
-# 初始化日志
+from path_manager import get_download_path, create_download_directories
+from .logger import setup_logger
 logger = setup_logger()
 
 def download_image(url, user_id, bid, index, overwrite=False):

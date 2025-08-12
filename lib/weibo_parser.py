@@ -1,11 +1,11 @@
 import os
 import re
 import json
-import logging
+
 from .media_downloader import download_image, download_video
 from .path_manager import get_download_path, create_download_directories
-
-logger = logging.getLogger(__name__)
+from .logger import setup_logger
+logger = setup_logger()
 
 def get_best_video_urls(weibo_data):
     """

@@ -4,10 +4,8 @@ import os
 import csv
 from datetime import datetime
 
-from .logger import setup_logger
 from .favorites_crawler import FavoritesCrawler
-
-# 初始化日志
+from .logger import setup_logger
 logger = setup_logger()
 
 def init_tasks_file():
@@ -56,7 +54,7 @@ def add_task_interactive():
     try:
         input_str = input("请输入下载任务 (格式: URL;备注): ").strip()
         if not input_str:
-            print("输入不能为空，任务添加取消")
+            logger.error("输入不能为空，任务添加取消")
             return False
 
         parts = input_str.split(';', 1)
@@ -200,6 +198,3 @@ if __name__ == "__main__":
     # 示例用法
     add_task_interactive()
     # tasks = get_pending_tasks()
-    # print(f"待处理任务数: {len(tasks)}")
-    # for task in tasks:
-    #     print(f"URL: {task['url']}, 备注: {task['notes']}") 

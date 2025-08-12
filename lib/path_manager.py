@@ -1,6 +1,9 @@
 import os
 import json
 
+from .logger import setup_logger
+logger = setup_logger()
+
 def get_download_path():
     """获取下载路径，如果不存在则提示用户输入"""
     saved_path = None
@@ -17,7 +20,7 @@ def get_download_path():
         pass
 
     # 如果没有找到设置或设置中没有下载路径，提示用户输入
-    print("请输入下载路径（留空则使用已保存的路径或当前目录）：")
+    logger.info("请输入下载路径（留空则使用已保存的路径或当前目录）：")
     download_path = input().strip()
 
     # 如果用户没有输入，优先使用已保存的路径，如果没有已保存的路径才使用当前目录
@@ -69,5 +72,5 @@ def save_download_path(download_path):
 
         return True
     except Exception as e:
-        print(f"保存设置时出错：{str(e)}")
+        logger.error(f"保存设置时出错：{str(e)}")
         return False 

@@ -2,10 +2,11 @@ import csv
 import json
 import time
 import requests
-
 from datetime import datetime
-import os
 from pathlib import Path
+
+from .logger import setup_logger
+logger = setup_logger()
 
 class FavoritesCrawler:
     def __init__(self, cookie_path='setting.json'):
@@ -49,7 +50,7 @@ class FavoritesCrawler:
                 data = response.json()
                 # 保存API返回的数据结构到debug文件夹
                 debug_file = self.save_debug_json(data)
-                print(f"API返回数据已保存到: {debug_file}")
+                logger.info(f"API返回数据已保存到: {debug_file}")
                 # 检查数据结构并返回正确的数据
                 if isinstance(data, dict):
                     if data.get('ok') == 1 and isinstance(data.get('data'), list):
@@ -59,13 +60,13 @@ class FavoritesCrawler:
                 elif isinstance(data, list):
                     return data
                 else:
-                    print(f"未知的数据结构: {type(data)}")
+                    logger.error(f"未知的数据结构: {type(data)}")
                     return []
             else:
-                print(f"获取收藏微博失败，状态码: {response.status_code}")
+                logger.error(f"获取收藏微博失败，状态码: {response.status_code}")
                 return []
         except Exception as e:
-            print(f"获取收藏微博时发生错误: {e}")
+            logger.error(f"获取收藏微博时发生错误: {e}")
             return []
 
     def parse_favorites(self, favorites):
@@ -74,14 +75,14 @@ class FavoritesCrawler:
 
         # 检查favorites是否为列表
         if not isinstance(favorites, list):
-            print(f"收藏微博数据不是列表类型: {type(favorites)}")
+            logger.error(f"收藏微博数据不是列表类型: {type(favorites)}")
             return result
 
         for fav in favorites:
             try:
                 # 检查fav的类型
                 if not isinstance(fav, dict):
-                    print(f"跳过非字典类型的收藏项: {type(fav)}")
+                    logger.warning(f"跳过非字典类型的收藏项: {type(fav)}")
                     continue
 
                 # 直接从fav中获取必要的字段
@@ -96,7 +97,7 @@ class FavoritesCrawler:
                         'favorited_time': created_at
                     })
             except Exception as e:
-                print(f"解析收藏项时出错: {e}")
+                logger.error(f"解析收藏项时出错: {e}")
                 continue
 
         return result
@@ -106,30 +107,30 @@ class FavoritesCrawler:
         all_favorites = []
 
         for page in range(1, max_pages + 1):
-            print(f"正在获取第 {page} 页收藏微博...")
+            logger.info(f"正在获取第 {page} 页收藏微博...")
             favorites = self.get_favorites(page=page)
 
             if not favorites:
-                print(f"第 {page} 页没有收藏微博数据，停止获取")
+                logger.warning(f"第 {page} 页没有收藏微博数据，停止获取")
                 break
 
             parsed_data = self.parse_favorites(favorites)
             if parsed_data:
                 all_favorites.extend(parsed_data)
-                print(f"成功解析第 {page} 页，获取到 {len(parsed_data)} 条收藏微博")
+                logger.info(f"成功解析第 {page} 页，获取到 {len(parsed_data)} 条收藏微博")
             else:
-                print(f"第 {page} 页解析结果为空")
+                logger.warning(f"第 {page} 页解析结果为空")
 
             # 防止请求过快
             time.sleep(2)
 
-        print(f"总共获取到 {len(all_favorites)} 条收藏微博")
+        logger.info(f"总共获取到 {len(all_favorites)} 条收藏微博")
         return all_favorites
 
     def save_to_csv(self, data: list[str], filename=None):
         """保存收藏微博URL到CSV文件"""
         if not data:
-            print("没有收藏微博数据可保存")
+            logger.warning("没有收藏微博数据可保存")
             return
 
         if filename is None:
