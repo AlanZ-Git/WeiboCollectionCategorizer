@@ -9,12 +9,11 @@ import argparse
 import sys
 import csv
 
-from lib.config import get_config, get_cookie  # 从config.py导入配置函数
+from lib.config import ConfigManager  # 从config.py导入配置函数
 from lib.weibo_api import extract_ids_from_url, get_single_weibo  # 从weibo_api.py导入函数
 from lib.weibo_parser import parse_weibo_data  # 从新的weibo_parser.py导入函数
 from lib.data_storage import save_to_csv  # 从新的data_storage.py导入函数
 from lib.task_manager import get_pending_tasks, update_task_status, create_task, add_task  # 从新的task_manager.py导入函数
-from lib.get_cookie import get_cookie_interactive, load_cookie  # 导入cookie获取函数
 from lib.path_manager import get_download_path, create_download_directories  # 导入路径管理函数
 from lib.logger import setup_logger
 logger = setup_logger('weibo')
@@ -34,23 +33,8 @@ def main(ignore_status=False, overwrite_pics=False, overwrite_videos=False):
     logger.info(f"找到 {len(tasks)} 个待处理任务")
 
     # 获取配置
-    config = get_config()
-    cookie = get_cookie(config)
-
-    # 检查cookie是否为空，如果为空则尝试从setting.json加载或交互式获取
-    if not cookie:
-        logger.warning("配置中的Cookie为空，尝试从setting.json加载")
-        cookie = load_cookie()
-
-        # 如果仍然为空，则交互式获取
-        if not cookie:
-            logger.info("未找到已保存的Cookie，启动交互式获取流程")
-            cookie = get_cookie_interactive()
-
-            # 如果用户取消或获取失败
-            if not cookie:
-                logger.error("无法获取Cookie，程序退出")
-                return
+    config = ConfigManager()
+    cookie = config.get_cookie()
 
     # 处理每个任务
     for task in tasks:
