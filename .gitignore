@@ -19,3 +19,6 @@ __pycache__/
 
 # 下载任务
 download_tasks*
+
+# 设计内容
+design/
