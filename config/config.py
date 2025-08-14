@@ -2,7 +2,7 @@ import os
 import json
 from typing import Optional, Dict, Any
 
-from .logger import setup_logger
+from utils.logger import setup_logger
 logger = setup_logger()
 
 
@@ -22,19 +22,16 @@ class ConfigManager:
             "download_path": "download",
             "cookie": ""
         }
-        
-    def get_setting(self, default_setting: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+
+    @property
+    def _setting(self) -> Dict[str, Any]:
         """
         获取json文件配置, 如果文件不存在则创建
-        
-        Args:
-            default_setting: 默认配置，如果为None则使用类的默认配置
-            
+
         Returns:
             Dict[str, Any]: 配置字典
         """
-        if default_setting is None:
-            default_setting = self.default_setting
+        default_setting = self.default_setting
 
         if not os.path.exists(self.config_path):
             return self._initialize_setting(default_setting)
@@ -46,12 +43,6 @@ class ConfigManager:
                     if set(setting_data.keys()) != set(default_setting.keys()):
                         logger.warning("setting.json 设置key不匹配, 已使用默认配置重建。")
                         return self._initialize_setting(default_setting)
-        
-                    # 检查下载路径是否存在
-                    download_path = setting_data['download_path']
-                    if not os.path.exists(download_path):
-                        logger.warning("检测到下载路径不存在, 已创建。")
-                        os.makedirs(download_path, exist_ok=True)
 
                     return setting_data
             except json.JSONDecodeError:
@@ -62,36 +53,32 @@ class ConfigManager:
     def _initialize_setting(self, default_setting: Dict[str, Any]) -> Dict[str, Any]:
         """
         初始化配置文件
-        
+
         Args:
             default_setting: 默认配置
-            
+
         Returns:
             Dict[str, Any]: 配置字典
         """
         with open(self.config_path, 'w', encoding='utf-8') as f:
             json.dump(default_setting, f, ensure_ascii=False, indent=4)
-        os.makedirs(default_setting["download_path"], exist_ok=True)
         return default_setting
 
-    def get_cookie(self, reload: bool = False) -> str:
+    @property
+    def cookie(self) -> str:
         """
-        从配置中获取cookie, 如果配置不存在或reload为True, 则重新获取
+        从配置中获取cookie, 如果配置不存在则交互式获取
 
-        Args:
-            reload: 是否强制重新获取cookie
-            
         Returns:
             str: cookie字符串, 如果获取失败则返回空字符串
         """
-        cookie = self.get_setting()['cookie']
-
-        if not cookie or reload:
-            return self.get_cookie_interactive()
+        cookie = self._setting.get('cookie', '')
+        if not cookie:
+            return self.reload_cookie()
         else:
             return cookie
 
-    def get_cookie_interactive(self) -> Optional[str]:
+    def reload_cookie(self) -> Optional[str]:
         """
         交互式获取并保存Cookie
         
@@ -122,7 +109,7 @@ class ConfigManager:
                 print("\n❌ 未输入任何内容，取消保存。")
                 return None
 
-            if self.save_cookie(cookie):
+            if self._save_cookie(cookie):
                 print("\n✅ Cookie已成功保存！")
                 return cookie
             else:
@@ -137,7 +124,7 @@ class ConfigManager:
             print(f"\n❌ 发生错误: {e}")
             return None
 
-    def save_cookie(self, cookie: str) -> bool:
+    def _save_cookie(self, cookie: str) -> bool:
         """
         保存Cookie到setting.json文件, 保留其他设置
         
@@ -148,7 +135,7 @@ class ConfigManager:
             bool: 保存是否成功
         """
         # 读取现有配置
-        setting = self.get_setting()
+        setting = self._setting
 
         # 更新cookie值
         if not isinstance(cookie, str) or not cookie.strip():
@@ -166,3 +153,21 @@ class ConfigManager:
         except Exception as e:
             logger.error(f"保存Cookie文件失败: {e}")
             return False
+
+    @property
+    def download_path(self) -> str:
+        """
+        获取下载路径，并确保路径文件夹已创建
+
+        Returns:
+            str: 下载路径
+        """
+        path = self._setting['download_path']
+        weibo_path = os.path.join(path, 'weibo')
+        media_path = os.path.join(weibo_path, 'media')
+
+        os.makedirs(path, exist_ok=True)
+        os.makedirs(weibo_path, exist_ok=True)
+        os.makedirs(media_path, exist_ok=True)
+
+        return path
