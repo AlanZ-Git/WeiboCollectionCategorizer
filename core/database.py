@@ -2,11 +2,11 @@ import os
 import csv
 from datetime import datetime
 
-from .path_manager import get_download_path, create_download_directories
+
 from .logger import setup_logger
 logger = setup_logger()
 
-def save_to_csv(weibo):
+def save_to_csv(weibo, download_path):
     """
     保存微博数据到CSV文件
 

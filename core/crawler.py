@@ -5,7 +5,7 @@ import requests
 from datetime import datetime
 from pathlib import Path
 
-from .logger import setup_logger
+from utils.logger import setup_logger
 logger = setup_logger()
 
 class FavoritesCrawler:

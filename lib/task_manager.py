@@ -1,4 +1,6 @@
-# task_manager.py - 任务管理模块
+"""
+当前任务管理模块基于CSV的文本进行, 可以参考逻辑, 基于sqlite重写
+"""
 
 import os
 import csv
